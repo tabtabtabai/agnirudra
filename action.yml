@@ -1,0 +1,64 @@
+name: "Agni Visual Test"
+description: "AI-powered visual QA testing for pull requests using Claude computer-use"
+author: "tabtabtabai"
+
+inputs:
+  anthropic-api-key:
+    description: "Anthropic API key"
+    required: true
+  azure-credentials:
+    description: "Azure service principal credentials JSON"
+    required: true
+  github-token:
+    description: "GitHub token for posting PR comments"
+    required: true
+  branch-filter:
+    description: "Only test PRs from branches with this prefix"
+    required: false
+    default: "claude/"
+  model:
+    description: "Claude model ID to use"
+    required: false
+    default: "claude-opus-4-5-20251101"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install Poetry
+      shell: bash
+      run: pip install poetry
+
+    - name: Install agnirudra
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: poetry install --no-interaction
+
+    - name: Parse Azure credentials
+      shell: bash
+      id: azure
+      run: |
+        echo "AZURE_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> "$GITHUB_ENV"
+        echo "AZURE_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> "$GITHUB_ENV"
+        echo "AZURE_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> "$GITHUB_ENV"
+        echo "AZURE_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> "$GITHUB_ENV"
+
+    - name: Run Agni orchestrator
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        AGNI_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        AGNI_GITHUB_TOKEN: ${{ inputs.github-token }}
+        AGNI_GITHUB_REPOSITORY: ${{ github.repository }}
+        AGNI_PR_NUMBER: ${{ github.event.pull_request.number }}
+        AGNI_AZURE_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        AGNI_AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+        AGNI_AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+        AGNI_AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+        AGNI_MODEL: ${{ inputs.model }}
+        AGNI_BRANCH_FILTER: ${{ inputs.branch-filter }}
+      run: poetry run python -m agnirudra.agni.orchestrator

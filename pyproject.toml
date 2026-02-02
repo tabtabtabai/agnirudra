@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "agnirudra"
+version = "0.1.0"
+description = "Agni: AI-powered visual QA testing for PRs. Rudra: Smart single-pass code review (coming soon)."
+authors = ["tabtabtabai"]
+license = "GPL-3.0-only"
+readme = "README.md"
+packages = [{include = "agnirudra", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+anthropic = ">=0.40.0"
+azure-mgmt-compute = ">=33.0.0"
+azure-mgmt-network = ">=27.0.0"
+azure-identity = ">=1.17.0"
+azure-storage-blob = ">=12.20.0"
+PyGithub = ">=2.1.0"
+httpx = ">=0.27.0"
+pydantic = ">=2.5.0"
+pydantic-settings = ">=2.2.0"
+click = ">=8.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4.0"
+pytest-asyncio = ">=0.23.0"
+pytest-mock = ">=3.12.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
