@@ -25,6 +25,7 @@ def _make_settings(**overrides):
         "azure_storage_container": "recordings",
         "docker_image": "ghcr.io/tabtabtabai/agnirudra:latest",
         "vm_timeout_seconds": 600,
+        "app_secrets": "{}",
     }
     defaults.update(overrides)
     mock = MagicMock()

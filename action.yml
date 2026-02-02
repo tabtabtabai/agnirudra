@@ -20,6 +20,10 @@ inputs:
     description: "Claude model ID to use"
     required: false
     default: "claude-opus-4-5-20251101"
+  app-secrets:
+    description: "JSON object of env vars your app needs (DB URLs, API keys, etc.)"
+    required: false
+    default: "{}"
 
 runs:
   using: "composite"
@@ -61,4 +65,5 @@ runs:
         AGNI_AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
         AGNI_MODEL: ${{ inputs.model }}
         AGNI_BRANCH_FILTER: ${{ inputs.branch-filter }}
+        AGNI_APP_SECRETS: ${{ inputs.app-secrets }}
       run: poetry run python -m agnirudra.agni.orchestrator

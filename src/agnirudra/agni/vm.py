@@ -39,22 +39,27 @@ set -euo pipefail
 # Install Docker
 curl -fsSL https://get.docker.com | sh
 
+# Build docker run command with env vars
+ENV_ARGS=""
+ENV_ARGS="$ENV_ARGS -e AGNI_ANTHROPIC_API_KEY='{anthropic_api_key}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_GITHUB_TOKEN='{github_token}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_GITHUB_REPOSITORY='{github_repository}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_PR_NUMBER='{pr_number}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_STORAGE_ACCOUNT='{storage_account}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_STORAGE_CONTAINER='{storage_container}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_SUBSCRIPTION_ID='{subscription_id}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_TENANT_ID='{tenant_id}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_CLIENT_ID='{client_id}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_CLIENT_SECRET='{client_secret}'"
+ENV_ARGS="$ENV_ARGS -e AGNI_MODEL='{model}'"
+ENV_ARGS="$ENV_ARGS -e TEST_PLAN='{test_plan_json}'"
+
+# Inject consumer app secrets (DB URLs, API keys, etc.)
+{app_secrets_env_lines}
+
 # Pull and run the Agni container
 docker pull {docker_image}
-docker run --rm \
-  -e AGNI_ANTHROPIC_API_KEY='{anthropic_api_key}' \
-  -e AGNI_GITHUB_TOKEN='{github_token}' \
-  -e AGNI_GITHUB_REPOSITORY='{github_repository}' \
-  -e AGNI_PR_NUMBER='{pr_number}' \
-  -e AGNI_AZURE_STORAGE_ACCOUNT='{storage_account}' \
-  -e AGNI_AZURE_STORAGE_CONTAINER='{storage_container}' \
-  -e AGNI_AZURE_SUBSCRIPTION_ID='{subscription_id}' \
-  -e AGNI_AZURE_TENANT_ID='{tenant_id}' \
-  -e AGNI_AZURE_CLIENT_ID='{client_id}' \
-  -e AGNI_AZURE_CLIENT_SECRET='{client_secret}' \
-  -e AGNI_MODEL='{model}' \
-  -e TEST_PLAN='{test_plan_json}' \
-  {docker_image}
+eval docker run --rm $ENV_ARGS {docker_image}
 """
 
 
@@ -152,6 +157,18 @@ def create_vm(
         }
     )
 
+    # Build app secrets env lines for the consumer app's own secrets
+    app_secrets_env_lines = ""
+    try:
+        app_secrets = json.loads(settings.app_secrets)
+        for key, value in app_secrets.items():
+            safe_val = str(value).replace("'", "'\\''")
+            app_secrets_env_lines += (
+                f"ENV_ARGS=\"$ENV_ARGS -e {key}='{safe_val}'\"\n"
+            )
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
     cloud_init = CLOUD_INIT_TEMPLATE.format(
         docker_image=settings.docker_image,
         anthropic_api_key=settings.anthropic_api_key,
@@ -166,6 +183,7 @@ def create_vm(
         client_secret=settings.azure_client_secret,
         model=settings.model,
         test_plan_json=test_plan_json.replace("'", "'\\''"),
+        app_secrets_env_lines=app_secrets_env_lines,
     )
     custom_data = base64.b64encode(cloud_init.encode()).decode()
 

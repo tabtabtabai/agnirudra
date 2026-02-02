@@ -65,6 +65,12 @@ class AgniSettings(BaseSettings):
         default="claude/", description="Only test PRs from branches with this prefix"
     )
 
+    # App secrets — JSON-encoded dict of env vars the consumer app needs
+    app_secrets: str = Field(
+        default="{}",
+        description="JSON-encoded dict of env vars to inject into the test VM for the app",
+    )
+
     # Display
     display_width: int = Field(default=1280, description="Virtual display width")
     display_height: int = Field(default=720, description="Virtual display height")
