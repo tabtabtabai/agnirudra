@@ -34,8 +34,8 @@ PR_INFO=$(curl -s -H "Authorization: token ${AGNI_GITHUB_TOKEN}" \
 PR_REF=$(echo "$PR_INFO" | jq -r '.head.ref')
 COMMIT_SHA=$(echo "$PR_INFO" | jq -r '.head.sha')
 
-git fetch origin "$PR_REF"
-git checkout "$PR_REF"
+git fetch origin "+refs/heads/$PR_REF:refs/remotes/origin/$PR_REF"
+git checkout -b "$PR_REF" "origin/$PR_REF"
 echo "Checked out branch: $PR_REF (commit: ${COMMIT_SHA:0:8})"
 
 # --- 5. Start services ---
