@@ -19,7 +19,6 @@ from agnirudra.agni.tools import computer, bash_tool
 
 logger = logging.getLogger(__name__)
 
-BETA_HEADER = "computer-use-2025-01-24"
 MAX_SCREENSHOTS_IN_CONTEXT = 10
 
 SYSTEM_PROMPT = """\
@@ -268,7 +267,6 @@ def run_agent_loop(
             system=system,
             tools=tools,
             messages=messages,
-            betas=[BETA_HEADER],
         )
 
         # Collect assistant content blocks

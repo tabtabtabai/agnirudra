@@ -69,9 +69,12 @@ def generate_sas_url(
     start_time = datetime.datetime.now(datetime.timezone.utc)
     expiry_time = start_time + datetime.timedelta(days=expiry_days)
 
+    # Azure user delegation keys are limited to 7 days max
+    delegation_expiry = start_time + datetime.timedelta(days=min(expiry_days, 7))
+
     user_delegation_key = blob_service.get_user_delegation_key(
         key_start_time=start_time,
-        key_expiry_time=expiry_time,
+        key_expiry_time=delegation_expiry,
     )
 
     sas_token = generate_blob_sas(
