@@ -169,7 +169,6 @@ def create_vm(
         logger.info("Loaded %d app secrets", len(app_secrets))
     except (json.JSONDecodeError, AttributeError) as exc:
         logger.error("Failed to parse app_secrets JSON: %s", exc)
-        logger.error("app_secrets value (first 200 chars): %s", settings.app_secrets[:200])
 
     # Docker --env-file format: KEY=VALUE, no quoting needed
     env_file_contents = "\n".join(
