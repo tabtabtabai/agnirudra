@@ -79,8 +79,12 @@ for svc in services:
     print(f"  [{name}] path={full_path} port={port}")
 
     # Build env with any service-specific vars merged with current env
+    # Expand ${VAR} references in values against the current environment
+    import re
     svc_env = os.environ.copy()
-    svc_env.update(env_vars)
+    for k, v in env_vars.items():
+        v = re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), str(v))
+        svc_env[k] = v
 
     if install_cmd:
         print(f"  [{name}] install: {install_cmd}")

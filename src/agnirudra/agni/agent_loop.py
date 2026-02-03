@@ -26,16 +26,17 @@ SYSTEM_PROMPT = """\
 You are Agni, an automated QA testing agent. You have a browser and a
 Linux desktop. Your job: visually verify that a PR's changes work.
 
-TEST PLAN:
+{auth_section}TEST PLAN:
 {test_plan}
 
 INSTRUCTIONS:
 1. Open Chromium and navigate to the start URL.
-2. Follow the test steps one by one.
-3. After each step, observe the result on screen.
-4. When done, write your verdict to /tmp/verdict.json:
+2. If the app shows a login or sign-in page, log in using the credentials above.
+3. Follow the test steps one by one.
+4. After each step, observe the result on screen.
+5. When done, write your verdict to /tmp/verdict.json:
    {{"passed": true/false, "summary": "what happened"}}
-5. If you cannot complete a step, note what went wrong and still write verdict.json.
+6. If you cannot complete a step, note what went wrong and still write verdict.json.
 """
 
 
@@ -218,6 +219,19 @@ def _truncate_old_screenshots(messages: list[dict]) -> list[dict]:
     return messages
 
 
+def _build_auth_section(test_email: str, test_password: str) -> str:
+    """Build the authentication section for the system prompt."""
+    if test_email and test_password:
+        return (
+            "AUTHENTICATION:\n"
+            "If the app shows a login/sign-in page, log in with:\n"
+            f"  Email: {test_email}\n"
+            f"  Password: {test_password}\n"
+            "Then continue with the test steps.\n\n"
+        )
+    return ""
+
+
 def run_agent_loop(
     api_key: str,
     model: str,
@@ -225,12 +239,15 @@ def run_agent_loop(
     max_iterations: int = 30,
     display_width: int = 1280,
     display_height: int = 720,
+    test_email: str = "",
+    test_password: str = "",
 ) -> Verdict:
     """Run the computer-use agent loop. Returns a Verdict."""
     client = anthropic.Anthropic(api_key=api_key)
 
     plan_text = _build_test_plan_text(test_plan)
-    system = SYSTEM_PROMPT.format(test_plan=plan_text)
+    auth_section = _build_auth_section(test_email, test_password)
+    system = SYSTEM_PROMPT.format(test_plan=plan_text, auth_section=auth_section)
     tools = _make_tools(display_width, display_height)
 
     messages: list[dict] = [
@@ -325,8 +342,16 @@ def main() -> None:
         logger.error("AGNI_ANTHROPIC_API_KEY is required")
         sys.exit(1)
 
+    test_email = os.environ.get("AGNI_TEST_EMAIL", "")
+    test_password = os.environ.get("AGNI_TEST_PASSWORD", "")
+
     test_plan = json.loads(test_plan_raw)
-    verdict = run_agent_loop(api_key, model, test_plan, max_iterations=max_iter)
+    verdict = run_agent_loop(
+        api_key, model, test_plan,
+        max_iterations=max_iter,
+        test_email=test_email,
+        test_password=test_password,
+    )
 
     # Write verdict for entrypoint.sh to pick up
     Path("/tmp/verdict.json").write_text(json.dumps({

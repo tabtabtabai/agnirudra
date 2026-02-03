@@ -57,7 +57,7 @@ class AgniSettings(BaseSettings):
         default=30, description="Max computer-use loop iterations"
     )
     vm_timeout_seconds: int = Field(
-        default=600, description="Max seconds to wait for VM completion"
+        default=900, description="Max seconds to wait for VM completion"
     )
 
     # Branch filter
