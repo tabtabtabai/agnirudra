@@ -25,6 +25,7 @@ def _make_settings(**overrides):
         "azure_storage_container": "recordings",
         "docker_image": "ghcr.io/tabtabtabai/agnirudra:latest",
         "vm_timeout_seconds": 600,
+        "run_attempt": 1,
         "app_secrets": "{}",
     }
     defaults.update(overrides)
@@ -70,7 +71,7 @@ def test_create_vm(mock_net_cls, mock_compute_cls, mock_cred):
     test_plan = _make_test_plan()
     vm_name = create_vm(settings, test_plan, "abc12345def")
 
-    assert vm_name == "agni-42-abc12345"
+    assert vm_name == "agni-42-abc12345-r1"
     mock_compute.virtual_machines.begin_create_or_update.assert_called_once()
 
 
