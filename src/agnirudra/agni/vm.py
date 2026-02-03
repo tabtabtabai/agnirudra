@@ -101,8 +101,8 @@ def create_vm(
         ip_name,
         {
             "location": location,
-            "sku": {"name": "Basic"},
-            "public_ip_allocation_method": "Dynamic",
+            "sku": {"name": "Standard"},
+            "public_ip_allocation_method": "Static",
         },
     )
     ip_result = ip_poller.result()
