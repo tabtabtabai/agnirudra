@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import secrets
 import time
 
 from azure.identity import ClientSecretCredential
@@ -215,9 +216,9 @@ def create_vm(
             os_profile=OSProfile(
                 computer_name=vm_name,
                 admin_username="agni",
+                admin_password=secrets.token_urlsafe(32),
                 linux_configuration=LinuxConfiguration(
-                    disable_password_authentication=True,
-                    ssh=None,
+                    disable_password_authentication=False,
                 ),
                 custom_data=custom_data,
             ),
