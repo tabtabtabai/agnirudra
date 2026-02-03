@@ -8,3 +8,4 @@ build/
 .venv/
 *.egg
 .env
+azure.txt
