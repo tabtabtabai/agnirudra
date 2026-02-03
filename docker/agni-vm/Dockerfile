@@ -33,7 +33,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 # Install agnirudra
 WORKDIR /app
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml poetry.lock* README.md ./
 COPY src/ ./src/
 
 RUN pip install --no-cache-dir poetry \
