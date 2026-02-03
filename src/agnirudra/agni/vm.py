@@ -40,27 +40,14 @@ set -euo pipefail
 # Install Docker
 curl -fsSL https://get.docker.com | sh
 
-# Build docker run command with env vars
-ENV_ARGS=""
-ENV_ARGS="$ENV_ARGS -e AGNI_ANTHROPIC_API_KEY='{anthropic_api_key}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_GITHUB_TOKEN='{github_token}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_GITHUB_REPOSITORY='{github_repository}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_PR_NUMBER='{pr_number}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_STORAGE_ACCOUNT='{storage_account}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_STORAGE_CONTAINER='{storage_container}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_SUBSCRIPTION_ID='{subscription_id}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_TENANT_ID='{tenant_id}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_CLIENT_ID='{client_id}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_AZURE_CLIENT_SECRET='{client_secret}'"
-ENV_ARGS="$ENV_ARGS -e AGNI_MODEL='{model}'"
-ENV_ARGS="$ENV_ARGS -e TEST_PLAN='{test_plan_json}'"
-
-# Inject consumer app secrets (DB URLs, API keys, etc.)
-{app_secrets_env_lines}
+# Write env vars to file (avoids shell quoting issues)
+cat > /tmp/agni.env <<'ENVEOF'
+{env_file_contents}
+ENVEOF
 
 # Pull and run the Agni container
 docker pull {docker_image}
-eval docker run --rm $ENV_ARGS {docker_image}
+docker run --rm --env-file /tmp/agni.env {docker_image}
 """
 
 
@@ -158,33 +145,38 @@ def create_vm(
         }
     )
 
-    # Build app secrets env lines for the consumer app's own secrets
-    app_secrets_env_lines = ""
+    # Build env file contents (KEY=VALUE, one per line)
+    env_vars: dict[str, str] = {
+        "AGNI_ANTHROPIC_API_KEY": settings.anthropic_api_key,
+        "AGNI_GITHUB_TOKEN": settings.github_token,
+        "AGNI_GITHUB_REPOSITORY": settings.github_repository,
+        "AGNI_PR_NUMBER": str(settings.pr_number),
+        "AGNI_AZURE_STORAGE_ACCOUNT": settings.azure_storage_account,
+        "AGNI_AZURE_STORAGE_CONTAINER": settings.azure_storage_container,
+        "AGNI_AZURE_SUBSCRIPTION_ID": settings.azure_subscription_id,
+        "AGNI_AZURE_TENANT_ID": settings.azure_tenant_id,
+        "AGNI_AZURE_CLIENT_ID": settings.azure_client_id,
+        "AGNI_AZURE_CLIENT_SECRET": settings.azure_client_secret,
+        "AGNI_MODEL": settings.model,
+        "TEST_PLAN": test_plan_json,
+    }
+
+    # Add consumer app secrets
     try:
         app_secrets = json.loads(settings.app_secrets)
         for key, value in app_secrets.items():
-            safe_val = str(value).replace("'", "'\\''")
-            app_secrets_env_lines += (
-                f"ENV_ARGS=\"$ENV_ARGS -e {key}='{safe_val}'\"\n"
-            )
+            env_vars[key] = str(value)
     except (json.JSONDecodeError, AttributeError):
         pass
 
+    # Docker --env-file format: KEY=VALUE, no quoting needed
+    env_file_contents = "\n".join(
+        f"{k}={v}" for k, v in env_vars.items()
+    )
+
     cloud_init = CLOUD_INIT_TEMPLATE.format(
         docker_image=settings.docker_image,
-        anthropic_api_key=settings.anthropic_api_key,
-        github_token=settings.github_token,
-        github_repository=settings.github_repository,
-        pr_number=settings.pr_number,
-        storage_account=settings.azure_storage_account,
-        storage_container=settings.azure_storage_container,
-        subscription_id=settings.azure_subscription_id,
-        tenant_id=settings.azure_tenant_id,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        model=settings.model,
-        test_plan_json=test_plan_json.replace("'", "'\\''"),
-        app_secrets_env_lines=app_secrets_env_lines,
+        env_file_contents=env_file_contents,
     )
     custom_data = base64.b64encode(cloud_init.encode()).decode()
 
