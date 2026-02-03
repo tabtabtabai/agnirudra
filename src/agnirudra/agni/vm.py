@@ -162,13 +162,11 @@ def create_vm(
     }
 
     # Add consumer app secrets
-    try:
+    if settings.app_secrets and settings.app_secrets.strip() != "{}":
         app_secrets = json.loads(settings.app_secrets)
         for key, value in app_secrets.items():
             env_vars[key] = str(value)
         logger.info("Loaded %d app secrets", len(app_secrets))
-    except (json.JSONDecodeError, AttributeError) as exc:
-        logger.error("Failed to parse app_secrets JSON: %s", exc)
 
     # Docker --env-file format: KEY=VALUE, no quoting needed
     env_file_contents = "\n".join(
