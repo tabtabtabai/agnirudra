@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import signal
 import sys
 
 from github import Github
@@ -19,6 +20,22 @@ from agnirudra.agni import github_reporter, trigger, vm
 from agnirudra.config import AgniSettings
 
 logger = logging.getLogger(__name__)
+
+
+def _teardown_on_signal(settings: AgniSettings, commit_hash: str) -> None:
+    """Register signal handlers so teardown runs even if the job is cancelled."""
+
+    def _handler(signum: int, _frame: object) -> None:
+        sig_name = signal.Signals(signum).name
+        logger.warning("Received %s — tearing down VM before exit", sig_name)
+        try:
+            vm.teardown_vm(settings, commit_hash)
+        except Exception as exc:
+            logger.warning("Teardown on signal failed: %s", exc)
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, _handler)
+    signal.signal(signal.SIGINT, _handler)
 
 
 def _get_head_commit(settings: AgniSettings) -> tuple[str, str]:
@@ -77,6 +94,9 @@ def run() -> None:
         sys.exit(1)
 
     logger.info("VM created: %s", vm_name)
+
+    # Register signal handlers so teardown runs on job cancellation
+    _teardown_on_signal(settings, commit_hash)
 
     # Step 4: Poll for completion
     logger.info("Waiting for test completion (timeout=%ds)...", settings.vm_timeout_seconds)

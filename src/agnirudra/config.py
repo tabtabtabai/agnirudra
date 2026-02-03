@@ -65,6 +65,11 @@ class AgniSettings(BaseSettings):
         default="claude/", description="Only test PRs from branches with this prefix"
     )
 
+    # GitHub Actions run attempt (for unique VM names across retries)
+    run_attempt: int = Field(
+        default=1, description="GitHub Actions run attempt number"
+    )
+
     # App secrets — JSON-encoded dict of env vars the consumer app needs
     app_secrets: str = Field(
         default="{}",

@@ -60,7 +60,7 @@ def _get_credential(settings: AgniSettings) -> ClientSecretCredential:
 
 
 def _vm_name(settings: AgniSettings, short_hash: str) -> str:
-    return f"agni-{settings.pr_number}-{short_hash[:8]}"
+    return f"agni-{settings.pr_number}-{short_hash[:8]}-r{settings.run_attempt}"
 
 
 def create_vm(
