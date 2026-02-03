@@ -88,7 +88,10 @@ for svc in services:
 
     if install_cmd:
         print(f"  [{name}] install: {install_cmd}")
-        subprocess.run(install_cmd, shell=True, cwd=full_path, env=svc_env, check=False)
+        result = subprocess.run(install_cmd, shell=True, cwd=full_path, env=svc_env)
+        if result.returncode != 0:
+            print(f"  ERROR: [{name}] install failed with exit code {result.returncode}")
+            sys.exit(1)
 
     if dev_cmd:
         print(f"  [{name}] dev: {dev_cmd}")
@@ -134,7 +137,10 @@ PYEOF
   return 1
 }
 
-start_services || echo "Service startup had issues, agent will try to handle it"
+if ! start_services; then
+  echo "FATAL: Service startup failed. Exiting."
+  exit 1
+fi
 
 # --- 6. Wait for app to be ready ---
 echo "[6/10] Waiting for services to be ready..."
@@ -184,7 +190,12 @@ for port in $ALL_PORTS; do
       break
     fi
     if [ "$i" -eq 60 ]; then
-      echo "  WARNING: Port $port did not become ready within 120s"
+      echo "FATAL: Port $port did not become ready within 120s"
+      # Dump service logs for debugging
+      for logfile in /tmp/*.log; do
+        [ -f "$logfile" ] && echo "=== $logfile ===" && tail -20 "$logfile"
+      done
+      exit 1
     fi
     sleep 2
   done
@@ -194,7 +205,9 @@ echo "Service readiness check complete."
 
 # --- 7. Run the agent loop ---
 echo "[7/10] Running Agni agent loop..."
-DISPLAY=:1 python -m agnirudra.agni.agent_loop || true
+DISPLAY=:1 python -m agnirudra.agni.agent_loop || {
+  echo "WARNING: Agent loop exited with code $?"
+}
 
 # --- 8. Stop recording ---
 echo "[8/10] Stopping screen recording..."
