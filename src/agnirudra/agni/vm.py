@@ -37,15 +37,17 @@ CLOUD_INIT_TEMPLATE = """\
 #!/bin/bash
 set -euo pipefail
 
-# Install Docker
-curl -fsSL https://get.docker.com | sh
+# Install Docker only if not pre-cached in VM image
+if ! command -v docker &>/dev/null; then
+  curl -fsSL https://get.docker.com | sh
+fi
 
 # Write env vars to file (avoids shell quoting issues)
 cat > /tmp/agni.env <<'ENVEOF'
 {env_file_contents}
 ENVEOF
 
-# Pull and run the Agni container
+# Pull (fast if layers are pre-cached) and run the Agni container
 docker pull {docker_image}
 docker run --rm --env-file /tmp/agni.env {docker_image}
 """
@@ -180,6 +182,17 @@ def create_vm(
     custom_data = base64.b64encode(cloud_init.encode()).decode()
 
     # --- VM ---
+    if settings.azure_vm_image:
+        image_ref = ImageReference(id=settings.azure_vm_image)
+        logger.info("Using pre-baked VM image: %s", settings.azure_vm_image)
+    else:
+        image_ref = ImageReference(
+            publisher="Canonical",
+            offer="0001-com-ubuntu-server-jammy",
+            sku="22_04-lts",
+            version="latest",
+        )
+
     vm_poller = compute_client.virtual_machines.begin_create_or_update(
         rg,
         vm_name,
@@ -189,12 +202,7 @@ def create_vm(
                 vm_size=VirtualMachineSizeTypes(settings.azure_vm_size)
             ),
             storage_profile=StorageProfile(
-                image_reference=ImageReference(
-                    publisher="Canonical",
-                    offer="0001-com-ubuntu-server-jammy",
-                    sku="22_04-lts",
-                    version="latest",
-                ),
+                image_reference=image_ref,
                 os_disk=OSDisk(
                     create_option=DiskCreateOptionTypes.FROM_IMAGE,
                     managed_disk=ManagedDiskParameters(

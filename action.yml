@@ -24,6 +24,10 @@ inputs:
     description: "JSON object of env vars your app needs (DB URLs, API keys, etc.)"
     required: false
     default: "{}"
+  vm-image:
+    description: "Azure managed image ID (from build-vm-image.sh) for faster VM boot"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -67,4 +71,5 @@ runs:
         AGNI_BRANCH_FILTER: ${{ inputs.branch-filter }}
         AGNI_APP_SECRETS: ${{ inputs.app-secrets }}
         AGNI_RUN_ATTEMPT: ${{ github.run_attempt }}
+        AGNI_AZURE_VM_IMAGE: ${{ inputs.vm-image }}
       run: poetry run python -m agnirudra.agni.orchestrator

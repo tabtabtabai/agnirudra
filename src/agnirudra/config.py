@@ -52,6 +52,12 @@ class AgniSettings(BaseSettings):
         description="Docker image for the test VM",
     )
 
+    # Pre-baked VM image (optional, speeds up boot by ~1.5-2 min)
+    azure_vm_image: str = Field(
+        default="",
+        description="Azure managed image resource ID (from build-vm-image.sh)",
+    )
+
     # Agent
     max_agent_iterations: int = Field(
         default=30, description="Max computer-use loop iterations"
