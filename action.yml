@@ -1,11 +1,20 @@
 name: "Agni Visual Test"
-description: "AI-powered visual QA testing for pull requests using Claude computer-use"
+description: "AI-powered visual QA testing for pull requests"
 author: "tabtabtabai"
 
 inputs:
   anthropic-api-key:
-    description: "Anthropic API key"
-    required: true
+    description: "Anthropic API key (required for Claude models)"
+    required: false
+    default: ""
+  nvidia-api-key:
+    description: "NVIDIA Build API key (required for Kimi K2.5)"
+    required: false
+    default: ""
+  google-api-key:
+    description: "Google AI API key (required for Gemini models)"
+    required: false
+    default: ""
   azure-credentials:
     description: "Azure service principal credentials JSON"
     required: true
@@ -17,9 +26,9 @@ inputs:
     required: false
     default: "claude/"
   model:
-    description: "Claude model ID to use"
+    description: "Model ID (claude-*, moonshotai/*, gemini-*)"
     required: false
-    default: "claude-sonnet-4-5-20250929"
+    default: "moonshotai/kimi-k2.5"
   app-secrets:
     description: "JSON object of env vars your app needs (DB URLs, API keys, etc.)"
     required: false
@@ -60,6 +69,8 @@ runs:
       working-directory: ${{ github.action_path }}
       env:
         AGNI_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        AGNI_NVIDIA_API_KEY: ${{ inputs.nvidia-api-key }}
+        AGNI_GOOGLE_API_KEY: ${{ inputs.google-api-key }}
         AGNI_GITHUB_TOKEN: ${{ inputs.github-token }}
         AGNI_GITHUB_REPOSITORY: ${{ github.repository }}
         AGNI_PR_NUMBER: ${{ github.event.pull_request.number }}
