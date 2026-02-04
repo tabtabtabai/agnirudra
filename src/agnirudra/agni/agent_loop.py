@@ -163,7 +163,7 @@ def _handle_text_editor(input_data: dict) -> dict:
     if command == "view":
         _, output = bash_tool.run(f"cat -n '{path}'")
         return {"type": "text", "text": output or "(empty file)"}
-    elif command == "write":
+    elif command in ("create", "write"):
         content = input_data.get("file_text", "")
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(content)
