@@ -169,6 +169,28 @@ def _build_player_html(recording_url: str) -> str:
 </html>"""
 
 
+def upload_trace(
+    settings: AgniSettings,
+    local_path: Path,
+    commit_hash: str,
+) -> str:
+    """Upload the agent trace log and return the blob path."""
+    blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/trace.log"
+    blob_service = _get_blob_service(settings)
+    container = blob_service.get_container_client(settings.azure_storage_container)
+    blob_client = container.get_blob_client(blob_path)
+
+    with open(local_path, "rb") as f:
+        blob_client.upload_blob(
+            f,
+            overwrite=True,
+            content_settings=ContentSettings(content_type="text/plain"),
+        )
+
+    logger.info("Uploaded trace to %s", blob_path)
+    return blob_path
+
+
 def delete_done_marker(settings: AgniSettings, commit_hash: str) -> None:
     """Delete any existing done.marker so stale results aren't picked up."""
     blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/done.marker"

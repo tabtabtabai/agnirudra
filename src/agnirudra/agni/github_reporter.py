@@ -20,7 +20,7 @@ REPORT_TEMPLATE = """\
 **Summary**: {summary}
 
 **Recording**: [![Watch test session]({thumbnail_url})]({recording_url})
-
+{trace_line}
 ---
 *Tested by [Agni](https://github.com/tabtabtabai/agnirudra)*\
 """
@@ -54,9 +54,11 @@ def post_result(
     commit_hash: str,
     commit_message: str,
     thumbnail_url: str = "",
+    trace_url: str = "",
 ) -> None:
     """Post a pass/fail result as a PR comment."""
     status = "PASS" if passed else "FAIL"
+    trace_line = f"\n**Agent Trace**: [View reasoning log]({trace_url})\n" if trace_url else ""
     body = REPORT_TEMPLATE.format(
         status=status,
         commit_hash=commit_hash[:8],
@@ -64,6 +66,7 @@ def post_result(
         summary=summary,
         recording_url=recording_url,
         thumbnail_url=thumbnail_url or recording_url,
+        trace_line=trace_line,
     )
     _post_comment(settings, body)
 

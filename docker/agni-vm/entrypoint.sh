@@ -253,7 +253,7 @@ echo "[11/11] Uploading recording to Azure Blob Storage..."
 python3 -c "
 import json
 from pathlib import Path
-from agnirudra.agni.storage import upload_recording, upload_thumbnail, upload_player_page, generate_sas_url, write_done_marker
+from agnirudra.agni.storage import upload_recording, upload_thumbnail, upload_trace, upload_player_page, generate_sas_url, write_done_marker
 from agnirudra.config import AgniSettings
 from agnirudra.agni.github_reporter import post_result, post_error
 
@@ -270,6 +270,13 @@ thumb_path = Path('/tmp/thumbnail.jpg')
 if thumb_path.exists():
     thumb_blob = upload_thumbnail(settings, thumb_path, commit_hash)
     thumbnail_url = generate_sas_url(settings, thumb_blob)
+
+# Upload agent trace if it exists
+trace_url = ''
+trace_path = Path('/tmp/agent_trace.log')
+if trace_path.exists() and trace_path.stat().st_size > 0:
+    trace_blob = upload_trace(settings, trace_path, commit_hash)
+    trace_url = generate_sas_url(settings, trace_blob)
 
 # Upload HTML video player page so clicking opens a player instead of downloading
 player_blob = upload_player_page(settings, recording_url, commit_hash)
@@ -290,6 +297,7 @@ post_result(
     commit_hash=commit_hash,
     commit_message='${PR_REF}',
     thumbnail_url=thumbnail_url,
+    trace_url=trace_url,
 )
 
 # Write done marker (include verdict so orchestrator can check pass/fail)
