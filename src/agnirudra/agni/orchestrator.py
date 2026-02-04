@@ -75,11 +75,13 @@ def run() -> None:
         github_reporter.post_error(settings, f"Failed to generate test plan: {exc}")
         sys.exit(1)
 
-    # Step 2: Skip if no UI changes
-    if test_plan.skip:
+    # Step 2: Skip if no UI changes (unless force_run is set, e.g. label trigger)
+    if test_plan.skip and not settings.force_run:
         logger.info("Skipping: %s", test_plan.skip_reason)
         github_reporter.post_skip(settings, test_plan.skip_reason)
         return
+    elif test_plan.skip and settings.force_run:
+        logger.info("Would skip (%s) but force_run is set — continuing", test_plan.skip_reason)
 
     logger.info("Test plan: %s", test_plan.description)
     logger.info("Steps: %s", test_plan.steps)

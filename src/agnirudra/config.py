@@ -75,6 +75,11 @@ class AgniSettings(BaseSettings):
         default=2400, description="Max seconds to wait for VM completion"
     )
 
+    # Force run (skip the "no UI changes" check)
+    force_run: bool = Field(
+        default=False, description="Skip the skip-check and always run the test"
+    )
+
     # Branch filter
     branch_filter: str = Field(
         default="claude/", description="Only test PRs from branches with this prefix"

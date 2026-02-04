@@ -32,6 +32,10 @@ inputs:
     description: "JSON object of env vars your app needs (DB URLs, API keys, etc.)"
     required: false
     default: "{}"
+  force-run:
+    description: "Skip the 'no UI changes' check and always run the test"
+    required: false
+    default: "false"
   vm-image:
     description: "Azure managed image ID (from build-vm-image.sh) for faster VM boot"
     required: false
@@ -81,5 +85,6 @@ runs:
         AGNI_BRANCH_FILTER: ${{ inputs.branch-filter }}
         AGNI_APP_SECRETS: ${{ inputs.app-secrets }}
         AGNI_RUN_ATTEMPT: ${{ github.run_attempt }}
+        AGNI_FORCE_RUN: ${{ inputs.force-run }}
         AGNI_AZURE_VM_IMAGE: ${{ inputs.vm-image }}
       run: poetry run python -m agnirudra.agni.orchestrator
