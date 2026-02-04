@@ -69,10 +69,10 @@ class AgniSettings(BaseSettings):
 
     # Agent
     max_agent_iterations: int = Field(
-        default=30, description="Max computer-use loop iterations"
+        default=50, description="Max computer-use loop iterations"
     )
     vm_timeout_seconds: int = Field(
-        default=900, description="Max seconds to wait for VM completion"
+        default=2400, description="Max seconds to wait for VM completion"
     )
 
     # Branch filter

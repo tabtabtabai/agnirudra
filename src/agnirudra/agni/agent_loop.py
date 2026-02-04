@@ -238,7 +238,7 @@ def run_agent_loop(
     api_key: str,
     model: str,
     test_plan: dict,
-    max_iterations: int = 30,
+    max_iterations: int = 50,
     display_width: int = 1280,
     display_height: int = 720,
     test_email: str = "",
@@ -384,7 +384,7 @@ def main() -> None:
 
     model = os.environ.get("AGNI_MODEL", "claude-opus-4-5-20251101")
     test_plan_raw = os.environ.get("TEST_PLAN", "{}")
-    max_iter = int(os.environ.get("AGNI_MAX_AGENT_ITERATIONS", "30"))
+    max_iter = int(os.environ.get("AGNI_MAX_AGENT_ITERATIONS", "50"))
 
     # Resolve the correct API key for this model
     api_key_env = get_api_key_env_var(model)
