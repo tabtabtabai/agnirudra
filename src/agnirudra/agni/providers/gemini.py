@@ -1,4 +1,8 @@
-"""Google Gemini 2.5 Computer Use provider — native computer-use."""
+"""Google Gemini 2.5 Computer Use provider — native computer-use.
+
+Based on Google's reference implementation:
+https://github.com/google-gemini/computer-use-preview/blob/main/agent.py
+"""
 
 from __future__ import annotations
 
@@ -12,6 +16,23 @@ from google.genai import types
 from agnirudra.agni.providers.base import BaseProvider, ProviderResponse, ProviderToolCall
 
 logger = logging.getLogger(__name__)
+
+# Predefined CU functions that return a screenshot + URL
+PREDEFINED_CU_FUNCTIONS = [
+    "open_web_browser",
+    "click_at",
+    "hover_at",
+    "type_text_at",
+    "scroll_document",
+    "scroll_at",
+    "wait_5_seconds",
+    "go_back",
+    "go_forward",
+    "search",
+    "navigate",
+    "key_combination",
+    "drag_and_drop",
+]
 
 
 def _grid_to_pixel(gx: int, gy: int, width: int, height: int) -> tuple[int, int]:
@@ -28,7 +49,7 @@ def _gemini_to_canonical(
       click_at, double_click_at, right_click_at, type_text_at,
       key_combination, scroll_document, scroll_at, navigate,
       hover_at, drag_and_drop, go_back, go_forward,
-      wait_5_seconds, open_web_browser, screenshot
+      wait_5_seconds, open_web_browser, screenshot, search
     """
     if name == "click_at":
         x, y = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
@@ -80,8 +101,10 @@ def _gemini_to_canonical(
         x, y = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
         return {"name": "computer", "input": {"action": "mouse_move", "coordinate": [x, y]}}
     elif name == "drag_and_drop":
-        sx, sy = _grid_to_pixel(args.get("start_x", 0), args.get("start_y", 0), width, height)
-        ex, ey = _grid_to_pixel(args.get("end_x", 0), args.get("end_y", 0), width, height)
+        sx, sy = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
+        ex, ey = _grid_to_pixel(
+            args.get("destination_x", 0), args.get("destination_y", 0), width, height
+        )
         return {"name": "computer", "input": {
             "action": "drag",
             "start_coordinate": [sx, sy],
@@ -95,9 +118,12 @@ def _gemini_to_canonical(
         return {"name": "bash", "input": {"command": "sleep 5"}}
     elif name == "open_web_browser":
         return {"name": "bash", "input": {"command": "browser about:blank"}}
+    elif name == "search":
+        # Focus the browser address bar
+        return {"name": "computer", "input": {"action": "key", "text": "ctrl+l"}}
     elif name == "screenshot":
         return {"name": "computer", "input": {"action": "screenshot"}}
-    elif name == "bash":
+    elif name in ("bash", "execute_command"):
         return {"name": "bash", "input": {"command": args.get("command", "")}}
     return {"name": name, "input": args}
 
@@ -111,8 +137,10 @@ class GeminiProvider(BaseProvider):
         self.model = model
         self.display_width = display_width
         self.display_height = display_height
-        # Maps tool_call_id → original Gemini function name for conversation round-trips
+        # Maps tool_call_id → original Gemini function name
         self._fn_name_map: dict[str, str] = {}
+        # Track the last known browser URL for function responses
+        self._current_url: str = "about:blank"
 
     def create_message(
         self, system: str, messages: list[dict]
@@ -149,6 +177,9 @@ class GeminiProvider(BaseProvider):
                     args = dict(fc.args) if fc.args else {}
                     tc_id = f"gemini_{uuid.uuid4().hex[:8]}"
                     self._fn_name_map[tc_id] = fc.name
+                    # Track URL from navigate calls
+                    if fc.name == "navigate" and "url" in args:
+                        self._current_url = args["url"]
                     canonical = _gemini_to_canonical(
                         fc.name, args, self.display_width, self.display_height
                     )
@@ -196,7 +227,13 @@ class GeminiProvider(BaseProvider):
     # ------------------------------------------------------------------
 
     def _convert_messages(self, messages: list[dict]) -> list[types.Content]:
-        """Convert internal message format to Gemini Content objects."""
+        """Convert internal message format to Gemini Content objects.
+
+        Follows Google's reference implementation format:
+        - Model turns: Content(role="model", parts=[function_call parts, text parts])
+        - User turns: Content(role="user", parts=[function_response parts])
+        - FunctionResponse includes {url: ...} and screenshot via FunctionResponsePart
+        """
         contents: list[types.Content] = []
 
         for msg in messages:
@@ -230,7 +267,6 @@ class GeminiProvider(BaseProvider):
                     ))
 
                 elif btype == "tool_use" and gemini_role == "model":
-                    # Reconstruct a function_call Part using original Gemini name
                     tc_id = block.get("id", "")
                     original_name = self._fn_name_map.get(tc_id, block.get("name", ""))
                     parts.append(types.Part(
@@ -243,20 +279,38 @@ class GeminiProvider(BaseProvider):
                 elif btype == "tool_result" and gemini_role == "user":
                     tc_id = block.get("tool_use_id", "")
                     original_name = self._fn_name_map.get(tc_id, "computer_use")
-                    result_text = self._extract_text_from_content(block.get("content", []))
-                    screenshot_bytes = self._extract_image_from_content(block.get("content", []))
+                    screenshot_bytes = self._extract_image_from_content(
+                        block.get("content", [])
+                    )
+
+                    # Build FunctionResponse matching Google's reference format
+                    fr_parts = None
+                    if screenshot_bytes and original_name in PREDEFINED_CU_FUNCTIONS:
+                        fr_parts = [
+                            types.FunctionResponsePart(
+                                inline_data=types.FunctionResponseBlob(
+                                    mime_type="image/png",
+                                    data=screenshot_bytes,
+                                )
+                            )
+                        ]
+
+                    response_dict: dict = {"url": self._current_url}
+
+                    # For non-CU functions (e.g. custom bash), include text output
+                    if original_name not in PREDEFINED_CU_FUNCTIONS:
+                        result_text = self._extract_text_from_content(
+                            block.get("content", [])
+                        )
+                        response_dict["output"] = result_text
 
                     parts.append(types.Part(
                         function_response=types.FunctionResponse(
                             name=original_name,
-                            response={"output": result_text},
+                            response=response_dict,
+                            parts=fr_parts,
                         )
                     ))
-                    if screenshot_bytes:
-                        parts.append(types.Part.from_bytes(
-                            data=screenshot_bytes,
-                            mime_type="image/png",
-                        ))
 
             if parts:
                 contents.append(types.Content(role=gemini_role, parts=parts))

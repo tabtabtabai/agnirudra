@@ -40,14 +40,16 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 RUN printf '#!/bin/bash\nexec firefox-esr --no-remote "$@"\n' \
     > /usr/local/bin/browser && chmod +x /usr/local/bin/browser
 
-# Install agnirudra
+# Install Python dependencies (cached unless pyproject.toml/poetry.lock change)
 WORKDIR /app
 COPY pyproject.toml poetry.lock* README.md ./
-COPY src/ ./src/
-
 RUN pip install --no-cache-dir poetry \
     && poetry config virtualenvs.create false \
-    && poetry install --no-interaction --without dev
+    && poetry install --no-interaction --without dev --no-root
+
+# Copy source and install the project package (fast, deps already cached)
+COPY src/ ./src/
+RUN poetry install --no-interaction --without dev
 
 COPY docker/agni-vm/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
