@@ -8,7 +8,7 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT = 120  # seconds
+TIMEOUT = 30  # seconds
 
 
 def run(command: str, timeout: int = TIMEOUT) -> tuple[int, str]:

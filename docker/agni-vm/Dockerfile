@@ -35,9 +35,27 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 
-# Browser wrapper
-RUN printf '#!/bin/bash\nexec firefox-esr --no-remote "$@"\n' \
+# Browser wrapper (nohup + redirect so subprocess.run doesn't block)
+RUN printf '#!/bin/bash\nnohup firefox-esr --no-remote "$@" >/dev/null 2>&1 &\ndisown\nsleep 1\necho "Browser launched"\n' \
     > /usr/local/bin/browser && chmod +x /usr/local/bin/browser
+
+# Suppress Firefox first-run dialogs and password manager
+RUN mkdir -p /root/.mozilla/firefox && \
+    printf '[General]\nStartWithLastProfile=1\n' > /root/.mozilla/firefox/profiles.ini && \
+    PROFILE_DIR=/root/.mozilla/firefox/default && mkdir -p "$PROFILE_DIR" && \
+    printf 'user_pref("browser.startup.homepage_override.mstone", "ignore");\n\
+user_pref("browser.shell.checkDefaultBrowser", false);\n\
+user_pref("signon.rememberSignons", false);\n\
+user_pref("signon.autofillForms", false);\n\
+user_pref("signon.management.page.breach-alerts.enabled", false);\n\
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);\n\
+user_pref("datareporting.policy.dataSubmissionEnabled", false);\n\
+user_pref("browser.aboutConfig.showWarning", false);\n\
+user_pref("browser.newtabpage.enabled", false);\n\
+user_pref("browser.startup.homepage", "about:blank");\n' \
+    > "$PROFILE_DIR/user.js" && \
+    printf '\n[Profile0]\nName=default\nIsRelative=1\nPath=default\nDefault=1\n' \
+    >> /root/.mozilla/firefox/profiles.ini
 
 # Install Python dependencies (cached unless pyproject.toml/poetry.lock change)
 WORKDIR /app
