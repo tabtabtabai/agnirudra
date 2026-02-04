@@ -95,6 +95,24 @@ def generate_sas_url(
     return url
 
 
+def upload_thumbnail(
+    settings: AgniSettings,
+    local_path: Path,
+    commit_hash: str,
+) -> str:
+    """Upload a thumbnail image and return the blob path."""
+    blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/thumbnail.jpg"
+    blob_service = _get_blob_service(settings)
+    container = blob_service.get_container_client(settings.azure_storage_container)
+    blob_client = container.get_blob_client(blob_path)
+
+    with open(local_path, "rb") as f:
+        blob_client.upload_blob(f, overwrite=True)
+
+    logger.info("Uploaded thumbnail to %s", blob_path)
+    return blob_path
+
+
 def write_done_marker(settings: AgniSettings, commit_hash: str) -> None:
     """Write a done.marker blob so the orchestrator knows we finished."""
     blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/done.marker"

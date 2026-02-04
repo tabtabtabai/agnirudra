@@ -19,6 +19,7 @@ from agnirudra.agni.tools import computer, bash_tool
 
 logger = logging.getLogger(__name__)
 
+COMPUTER_USE_BETA = "computer-use-2025-01-24"
 MAX_SCREENSHOTS_IN_CONTEXT = 10
 
 SYSTEM_PROMPT = """\
@@ -29,13 +30,17 @@ Linux desktop. Your job: visually verify that a PR's changes work.
 {test_plan}
 
 INSTRUCTIONS:
-1. Open Chromium and navigate to the start URL.
+1. Open a browser by running: browser {start_url}
 2. If the app shows a login or sign-in page, log in using the credentials above.
 3. Follow the test steps one by one.
 4. After each step, observe the result on screen.
 5. When done, write your verdict to /tmp/verdict.json:
    {{"passed": true/false, "summary": "what happened"}}
 6. If you cannot complete a step, note what went wrong and still write verdict.json.
+
+ENVIRONMENT:
+- Use the `browser` command to open URLs (not chromium-browser directly).
+- The display is 1280x720. Take screenshots to see what's on screen.
 """
 
 
@@ -71,7 +76,7 @@ def _make_tools(width: int, height: int) -> list[dict]:
         },
         {
             "type": "text_editor_20250728",
-            "name": "text_editor",
+            "name": "str_replace_based_edit_tool",
         },
     ]
 
@@ -85,7 +90,7 @@ def _handle_tool_call(tool_use: dict) -> dict:
         return _handle_computer_tool(input_data)
     elif name == "bash":
         return _handle_bash_tool(input_data)
-    elif name == "text_editor":
+    elif name in ("text_editor", "str_replace_based_edit_tool"):
         return _handle_text_editor(input_data)
     else:
         return {"type": "text", "text": f"Unknown tool: {name}"}
@@ -246,7 +251,12 @@ def run_agent_loop(
 
     plan_text = _build_test_plan_text(test_plan)
     auth_section = _build_auth_section(test_email, test_password)
-    system = SYSTEM_PROMPT.format(test_plan=plan_text, auth_section=auth_section)
+    start_url = test_plan.get("start_url", "http://localhost:3000")
+    system = SYSTEM_PROMPT.format(
+        test_plan=plan_text,
+        auth_section=auth_section,
+        start_url=start_url,
+    )
     tools = _make_tools(display_width, display_height)
 
     messages: list[dict] = [
@@ -261,12 +271,13 @@ def run_agent_loop(
 
         messages = _truncate_old_screenshots(messages)
 
-        response = client.messages.create(
+        response = client.beta.messages.create(
             model=model,
             max_tokens=4096,
             system=system,
             tools=tools,
             messages=messages,
+            betas=[COMPUTER_USE_BETA],
         )
 
         # Collect assistant content blocks

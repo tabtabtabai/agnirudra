@@ -215,12 +215,17 @@ kill -INT "$FFMPEG_PID" 2>/dev/null || true
 sleep 3
 wait "$FFMPEG_PID" 2>/dev/null || true
 
+# --- 8b. Extract thumbnail ---
+echo "Extracting thumbnail from recording..."
+ffmpeg -y -sseof -3 -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || \
+  ffmpeg -y -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || true
+
 # --- 9. Upload recording ---
 echo "[9/10] Uploading recording to Azure Blob Storage..."
 python3 -c "
 import json
 from pathlib import Path
-from agnirudra.agni.storage import upload_recording, generate_sas_url, write_done_marker
+from agnirudra.agni.storage import upload_recording, upload_thumbnail, generate_sas_url, write_done_marker
 from agnirudra.config import AgniSettings
 from agnirudra.agni.github_reporter import post_result, post_error
 
@@ -230,6 +235,13 @@ commit_hash = '${COMMIT_SHA}'
 # Upload recording
 blob_path = upload_recording(settings, Path('/tmp/recording.mp4'), commit_hash)
 recording_url = generate_sas_url(settings, blob_path)
+
+# Upload thumbnail if it exists
+thumbnail_url = ''
+thumb_path = Path('/tmp/thumbnail.jpg')
+if thumb_path.exists():
+    thumb_blob = upload_thumbnail(settings, thumb_path, commit_hash)
+    thumbnail_url = generate_sas_url(settings, thumb_blob)
 
 # Read verdict
 verdict = {'passed': False, 'summary': 'Agent did not produce a verdict'}
@@ -245,6 +257,7 @@ post_result(
     recording_url=recording_url,
     commit_hash=commit_hash,
     commit_message='${PR_REF}',
+    thumbnail_url=thumbnail_url,
 )
 
 # Write done marker

@@ -67,6 +67,31 @@ def test_post_result_fail(mock_github_cls):
 
 
 @patch("agnirudra.agni.github_reporter.Github")
+def test_post_result_with_thumbnail(mock_github_cls):
+    """Test that thumbnail URL is embedded as a clickable image."""
+    from agnirudra.agni.github_reporter import post_result
+
+    mock_gh = MagicMock()
+    mock_github_cls.return_value = mock_gh
+    mock_pr = MagicMock()
+    mock_gh.get_repo.return_value.get_pull.return_value = mock_pr
+
+    settings = _make_settings()
+    post_result(
+        settings,
+        passed=True,
+        summary="All good",
+        recording_url="https://example.com/recording.mp4",
+        commit_hash="abc12345",
+        commit_message="Test PR",
+        thumbnail_url="https://example.com/thumbnail.jpg",
+    )
+
+    body = mock_pr.create_issue_comment.call_args[0][0]
+    assert "[![Watch test session](https://example.com/thumbnail.jpg)](https://example.com/recording.mp4)" in body
+
+
+@patch("agnirudra.agni.github_reporter.Github")
 def test_post_skip(mock_github_cls):
     """Test posting a SKIPPED comment."""
     from agnirudra.agni.github_reporter import post_skip

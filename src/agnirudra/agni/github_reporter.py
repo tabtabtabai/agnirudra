@@ -19,7 +19,7 @@ REPORT_TEMPLATE = """\
 
 **Summary**: {summary}
 
-**Recording**: [Watch test session]({recording_url})
+**Recording**: [![Watch test session]({thumbnail_url})]({recording_url})
 
 ---
 *Tested by [Agni](https://github.com/tabtabtabai/agnirudra)*\
@@ -53,6 +53,7 @@ def post_result(
     recording_url: str,
     commit_hash: str,
     commit_message: str,
+    thumbnail_url: str = "",
 ) -> None:
     """Post a pass/fail result as a PR comment."""
     status = "PASS" if passed else "FAIL"
@@ -62,6 +63,7 @@ def post_result(
         commit_message=commit_message,
         summary=summary,
         recording_url=recording_url,
+        thumbnail_url=thumbnail_url or recording_url,
     )
     _post_comment(settings, body)
 

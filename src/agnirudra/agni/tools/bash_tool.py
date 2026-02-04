@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ def run(command: str, timeout: int = TIMEOUT) -> tuple[int, str]:
             capture_output=True,
             text=True,
             timeout=timeout,
-            env={"DISPLAY": ":1", "HOME": "/root", "PATH": "/usr/local/bin:/usr/bin:/bin"},
+            env={**os.environ, "DISPLAY": ":1", "HOME": "/root"},
         )
         output = result.stdout + result.stderr
         # Truncate very long output to avoid context blowout
