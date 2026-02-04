@@ -27,7 +27,7 @@ inputs:
   model:
     description: "Model ID (claude-*, moonshotai/*, gemini-*)"
     required: false
-    default: "claude-sonnet-4-5-20250929"
+    default: "claude-opus-4-5-20251101"
   app-secrets:
     description: "JSON object of env vars your app needs (DB URLs, API keys, etc.)"
     required: false
