@@ -203,6 +203,27 @@ done
 
 echo "Service readiness check complete."
 
+# --- 6b. Override start_url from .agni.yml test_target ---
+if [ -f .agni.yml ]; then
+  START_URL=$(python3 -c "
+import yaml, json, os
+with open('.agni.yml') as f:
+    c = yaml.safe_load(f)
+target = c.get('test_target', '')
+port = c.get('port', 3000)
+for svc in c.get('services', []):
+    if svc.get('name') == target:
+        port = svc.get('port', 3000)
+        break
+base = c.get('base_url', f'http://localhost:{port}')
+# Patch TEST_PLAN with the correct start_url
+plan = json.loads(os.environ.get('TEST_PLAN', '{}'))
+plan['start_url'] = base
+print(json.dumps(plan))
+" 2>/dev/null) && export TEST_PLAN="$START_URL"
+  echo "Overrode start_url from .agni.yml: $(echo "$TEST_PLAN" | python3 -c 'import sys,json;print(json.load(sys.stdin).get(\"start_url\",\"?\"))')"
+fi
+
 # --- 7. Run the agent loop ---
 echo "[7/10] Running Agni agent loop..."
 DISPLAY=:1 python -m agnirudra.agni.agent_loop || {
