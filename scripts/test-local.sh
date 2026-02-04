@@ -42,13 +42,7 @@ run_check "FFmpeg records and stops"            "Xvfb :99 -screen 0 1280x720x24 
 # --- Browser wrapper ---
 info "Testing browser wrapper..."
 run_check "browser wrapper exists"              "test -x /usr/local/bin/browser"
-# Note: browser --version only works on x86_64 (Google Chrome .deb)
-ARCH=$(docker run --rm --entrypoint uname "$IMAGE" -m 2>/dev/null || echo "unknown")
-if [ "$ARCH" = "x86_64" ]; then
-    run_check "browser --version works"         "Xvfb :99 -screen 0 1280x720x24 & sleep 1 && DISPLAY=:99 browser --version > /dev/null 2>&1"
-else
-    info "Skipping browser version check (arch=$ARCH, Chrome .deb is x86_64 only)"
-fi
+run_check "browser --version works"             "browser --version > /dev/null 2>&1"
 
 # --- Summary ---
 echo ""
