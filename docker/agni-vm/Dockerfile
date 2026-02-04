@@ -6,7 +6,7 @@ ENV DISPLAY=:1
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
-    mutter \
+    openbox \
     chromium-browser \
     ffmpeg \
     xdotool \

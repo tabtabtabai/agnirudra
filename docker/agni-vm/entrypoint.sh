@@ -8,10 +8,10 @@ echo "[1/10] Starting Xvfb..."
 Xvfb :1 -screen 0 1280x720x24 &
 sleep 1
 
-# --- 2. Start window manager ---
-echo "[2/10] Starting mutter..."
-DISPLAY=:1 mutter --replace --sm-disable &
-sleep 2
+# --- 2. Start window manager (non-compositing so x11grab can capture the root window) ---
+echo "[2/10] Starting openbox..."
+DISPLAY=:1 openbox &
+sleep 1
 
 # --- 3. Start screen recording ---
 echo "[3/10] Starting FFmpeg screen recording..."
