@@ -222,8 +222,13 @@ print(json.dumps(plan))
   echo "Overrode start_url from .agni.yml: $(echo "$TEST_PLAN" | python3 -c 'import sys,json;print(json.load(sys.stdin).get(\"start_url\",\"?\"))')"
 fi
 
-# --- 8. Start screen recording (right before agent so we don't record blank startup) ---
-echo "[8/11] Starting screen recording..."
+# --- 8. Pre-launch browser so agent doesn't waste iterations opening it ---
+echo "[8/12] Pre-launching Firefox..."
+DISPLAY=:1 nohup firefox-esr --no-remote "about:blank" >/dev/null 2>&1 &
+sleep 2
+
+# --- 9. Start screen recording (right before agent so we don't record blank startup) ---
+echo "[9/12] Starting screen recording..."
 DISPLAY=:1 ffmpeg -y \
   -f x11grab -video_size 1280x720 -framerate 15 -i :1 \
   -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p \
@@ -231,14 +236,14 @@ DISPLAY=:1 ffmpeg -y \
 FFMPEG_PID=$!
 sleep 1
 
-# --- 9. Run the agent loop ---
-echo "[9/11] Running Agni agent loop..."
+# --- 10. Run the agent loop ---
+echo "[10/12] Running Agni agent loop..."
 DISPLAY=:1 python -m agnirudra.agni.agent_loop || {
   echo "WARNING: Agent loop exited with code $?"
 }
 
-# --- 10. Stop recording ---
-echo "[10/11] Stopping screen recording..."
+# --- 11. Stop recording ---
+echo "[11/12] Stopping screen recording..."
 kill -INT "$FFMPEG_PID" 2>/dev/null || true
 sleep 3
 wait "$FFMPEG_PID" 2>/dev/null || true
@@ -248,8 +253,8 @@ echo "Extracting thumbnail from recording..."
 ffmpeg -y -sseof -3 -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || \
   ffmpeg -y -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || true
 
-# --- 11. Upload recording ---
-echo "[11/11] Uploading recording to Azure Blob Storage..."
+# --- 12. Upload recording ---
+echo "[12/12] Uploading recording to Azure Blob Storage..."
 python3 -c "
 import json
 from pathlib import Path
