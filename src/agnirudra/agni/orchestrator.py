@@ -100,7 +100,7 @@ def run() -> None:
 
     # Step 4: Poll for completion
     logger.info("Waiting for test completion (timeout=%ds)...", settings.vm_timeout_seconds)
-    completed = vm.poll_for_completion(settings, commit_hash)
+    verdict = vm.poll_for_completion(settings, commit_hash)
 
     # Step 5: Teardown
     logger.info("Tearing down VM...")
@@ -109,14 +109,19 @@ def run() -> None:
     except Exception as exc:
         logger.warning("VM teardown error (non-fatal): %s", exc)
 
-    if not completed:
+    if verdict is None:
         github_reporter.post_error(
             settings,
             "Test timed out. The VM was running for too long.",
         )
         sys.exit(1)
 
-    logger.info("Orchestrator complete.")
+    passed = verdict.get("passed", False)
+    summary = verdict.get("summary", "")
+    logger.info("Orchestrator complete. Passed: %s — %s", passed, summary)
+
+    if not passed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

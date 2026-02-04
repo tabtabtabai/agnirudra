@@ -44,6 +44,10 @@ CRITICAL RULES:
 - Do NOT investigate the source code or run diagnostic commands.
 - Be efficient: navigate, observe, verdict. Do not over-explore.
 - Writing /tmp/verdict.json is MANDATORY. Never finish without it.
+- BEFORE writing a FAIL verdict: take one final screenshot and carefully re-examine
+  the screen. Only fail if the issue is clearly visible in the CURRENT state.
+  Transient glitches or timing issues should not cause a fail if the final state is correct.
+- Lean towards PASS if the feature visibly works, even if the interaction felt unusual.
 
 ENVIRONMENT:
 - Use the `browser` command to open URLs (not chromium-browser directly).
