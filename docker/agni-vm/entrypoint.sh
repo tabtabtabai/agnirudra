@@ -246,7 +246,7 @@ echo "[9/10] Uploading recording to Azure Blob Storage..."
 python3 -c "
 import json
 from pathlib import Path
-from agnirudra.agni.storage import upload_recording, upload_thumbnail, generate_sas_url, write_done_marker
+from agnirudra.agni.storage import upload_recording, upload_thumbnail, upload_player_page, generate_sas_url, write_done_marker
 from agnirudra.config import AgniSettings
 from agnirudra.agni.github_reporter import post_result, post_error
 
@@ -264,6 +264,10 @@ if thumb_path.exists():
     thumb_blob = upload_thumbnail(settings, thumb_path, commit_hash)
     thumbnail_url = generate_sas_url(settings, thumb_blob)
 
+# Upload HTML video player page so clicking opens a player instead of downloading
+player_blob = upload_player_page(settings, recording_url, commit_hash)
+player_url = generate_sas_url(settings, player_blob)
+
 # Read verdict
 verdict = {'passed': False, 'summary': 'Agent did not produce a verdict'}
 verdict_path = Path('/tmp/verdict.json')
@@ -275,7 +279,7 @@ post_result(
     settings,
     passed=verdict.get('passed', False),
     summary=verdict.get('summary', 'No summary'),
-    recording_url=recording_url,
+    recording_url=player_url,
     commit_hash=commit_hash,
     commit_message='${PR_REF}',
     thumbnail_url=thumbnail_url,

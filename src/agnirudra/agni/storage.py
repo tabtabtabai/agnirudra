@@ -10,6 +10,7 @@ from azure.identity import ClientSecretCredential
 from azure.storage.blob import (
     BlobSasPermissions,
     BlobServiceClient,
+    ContentSettings,
     generate_blob_sas,
 )
 
@@ -42,7 +43,11 @@ def upload_recording(
     blob_client = container.get_blob_client(blob_path)
 
     with open(local_path, "rb") as f:
-        blob_client.upload_blob(f, overwrite=True, content_settings=None)
+        blob_client.upload_blob(
+            f,
+            overwrite=True,
+            content_settings=ContentSettings(content_type="video/mp4"),
+        )
 
     logger.info("Uploaded recording to %s", blob_path)
     return blob_path
@@ -67,14 +72,13 @@ def generate_sas_url(
     )
 
     start_time = datetime.datetime.now(datetime.timezone.utc)
-    expiry_time = start_time + datetime.timedelta(days=expiry_days)
-
-    # Azure user delegation keys are limited to 7 days max
-    delegation_expiry = start_time + datetime.timedelta(days=min(expiry_days, 7))
+    # User delegation keys are limited to 7 days; SAS cannot outlive the key
+    capped_days = min(expiry_days, 7)
+    expiry_time = start_time + datetime.timedelta(days=capped_days)
 
     user_delegation_key = blob_service.get_user_delegation_key(
         key_start_time=start_time,
-        key_expiry_time=delegation_expiry,
+        key_expiry_time=expiry_time,
     )
 
     sas_token = generate_blob_sas(
@@ -107,10 +111,62 @@ def upload_thumbnail(
     blob_client = container.get_blob_client(blob_path)
 
     with open(local_path, "rb") as f:
-        blob_client.upload_blob(f, overwrite=True)
+        blob_client.upload_blob(
+            f,
+            overwrite=True,
+            content_settings=ContentSettings(content_type="image/jpeg"),
+        )
 
     logger.info("Uploaded thumbnail to %s", blob_path)
     return blob_path
+
+
+def upload_player_page(
+    settings: AgniSettings,
+    recording_sas_url: str,
+    commit_hash: str,
+) -> str:
+    """Upload an HTML video player page and return the blob path."""
+    blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/player.html"
+    html = _build_player_html(recording_sas_url)
+    blob_service = _get_blob_service(settings)
+    container = blob_service.get_container_client(settings.azure_storage_container)
+    blob_client = container.get_blob_client(blob_path)
+    blob_client.upload_blob(
+        html.encode(),
+        overwrite=True,
+        content_settings=ContentSettings(content_type="text/html"),
+    )
+    logger.info("Uploaded player page to %s", blob_path)
+    return blob_path
+
+
+def _build_player_html(recording_url: str) -> str:
+    """Build a minimal HTML page with a video player."""
+    from html import escape
+
+    safe_url = escape(recording_url, quote=True)
+    return f"""\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agni Test Recording</title>
+<style>
+  body {{ margin:0; background:#111; display:flex; align-items:center;
+         justify-content:center; min-height:100vh; font-family:system-ui }}
+  video {{ max-width:100%; max-height:100vh; border-radius:8px;
+           box-shadow:0 4px 24px rgba(0,0,0,.5) }}
+</style>
+</head>
+<body>
+<video controls autoplay>
+  <source src="{safe_url}" type="video/mp4">
+  <a href="{safe_url}">Download recording</a>
+</video>
+</body>
+</html>"""
 
 
 def write_done_marker(settings: AgniSettings, commit_hash: str) -> None:
