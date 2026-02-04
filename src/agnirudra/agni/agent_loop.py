@@ -109,8 +109,14 @@ def _handle_computer_tool(input_data: dict) -> dict | list:
         coords = input_data.get("coordinate", [0, 0])
         computer.mouse_move(coords[0], coords[1])
     elif action == "type":
+        # Gemini's type_text_at provides a coordinate — click there first
+        coords = input_data.get("coordinate")
+        if coords:
+            computer.click(coords[0], coords[1], button=1)
         text = input_data.get("text", "")
         computer.type_text(text)
+        if input_data.get("press_enter"):
+            computer.key("Return")
     elif action == "key":
         keys = input_data.get("text", "")
         computer.key(keys)

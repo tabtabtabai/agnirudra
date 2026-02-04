@@ -22,7 +22,14 @@ def _grid_to_pixel(gx: int, gy: int, width: int, height: int) -> tuple[int, int]
 def _gemini_to_canonical(
     name: str, args: dict, width: int, height: int
 ) -> dict:
-    """Map a Gemini function_call to the canonical tool format."""
+    """Map a Gemini CU function_call to the canonical tool format.
+
+    Gemini computer_use predefined functions:
+      click_at, double_click_at, right_click_at, type_text_at,
+      key_combination, scroll_document, scroll_at, navigate,
+      hover_at, drag_and_drop, go_back, go_forward,
+      wait_5_seconds, open_web_browser, screenshot
+    """
     if name == "click_at":
         x, y = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
         return {"name": "computer", "input": {"action": "left_click", "coordinate": [x, y]}}
@@ -32,16 +39,31 @@ def _gemini_to_canonical(
     elif name == "right_click_at":
         x, y = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
         return {"name": "computer", "input": {"action": "right_click", "coordinate": [x, y]}}
-    elif name == "type_text":
-        text = args.get("text", "")
-        result = {"name": "computer", "input": {"action": "type", "text": text}}
+    elif name == "type_text_at":
+        x, y = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
+        result = {
+            "name": "computer",
+            "input": {
+                "action": "type",
+                "text": args.get("text", ""),
+                "coordinate": [x, y],
+            },
+        }
         if args.get("press_enter"):
-            # Will be handled as a two-step action in agent_loop
             result["input"]["press_enter"] = True
         return result
-    elif name == "press_key":
-        return {"name": "computer", "input": {"action": "key", "text": args.get("key", "")}}
-    elif name == "scroll":
+    elif name == "key_combination":
+        return {"name": "computer", "input": {"action": "key", "text": args.get("keys", "")}}
+    elif name == "scroll_document":
+        direction = args.get("direction", "down")
+        amount = args.get("amount", 3)
+        return {"name": "computer", "input": {
+            "action": "scroll",
+            "coordinate": [width // 2, height // 2],
+            "direction": direction,
+            "amount": amount,
+        }}
+    elif name == "scroll_at":
         x, y = _grid_to_pixel(args.get("x", 500), args.get("y", 500), width, height)
         direction = args.get("direction", "down")
         amount = args.get("amount", 3)
@@ -54,9 +76,25 @@ def _gemini_to_canonical(
     elif name == "navigate":
         url = args.get("url", "")
         return {"name": "bash", "input": {"command": f"browser {url}"}}
-    elif name == "wait":
-        secs = args.get("seconds", 2)
-        return {"name": "bash", "input": {"command": f"sleep {secs}"}}
+    elif name == "hover_at":
+        x, y = _grid_to_pixel(args.get("x", 0), args.get("y", 0), width, height)
+        return {"name": "computer", "input": {"action": "mouse_move", "coordinate": [x, y]}}
+    elif name == "drag_and_drop":
+        sx, sy = _grid_to_pixel(args.get("start_x", 0), args.get("start_y", 0), width, height)
+        ex, ey = _grid_to_pixel(args.get("end_x", 0), args.get("end_y", 0), width, height)
+        return {"name": "computer", "input": {
+            "action": "drag",
+            "start_coordinate": [sx, sy],
+            "end_coordinate": [ex, ey],
+        }}
+    elif name == "go_back":
+        return {"name": "bash", "input": {"command": "xdotool key alt+Left"}}
+    elif name == "go_forward":
+        return {"name": "bash", "input": {"command": "xdotool key alt+Right"}}
+    elif name == "wait_5_seconds":
+        return {"name": "bash", "input": {"command": "sleep 5"}}
+    elif name == "open_web_browser":
+        return {"name": "bash", "input": {"command": "browser about:blank"}}
     elif name == "screenshot":
         return {"name": "computer", "input": {"action": "screenshot"}}
     elif name == "bash":
@@ -73,6 +111,8 @@ class GeminiProvider(BaseProvider):
         self.model = model
         self.display_width = display_width
         self.display_height = display_height
+        # Maps tool_call_id → original Gemini function name for conversation round-trips
+        self._fn_name_map: dict[str, str] = {}
 
     def create_message(
         self, system: str, messages: list[dict]
@@ -107,11 +147,13 @@ class GeminiProvider(BaseProvider):
                 elif part.function_call:
                     fc = part.function_call
                     args = dict(fc.args) if fc.args else {}
+                    tc_id = f"gemini_{uuid.uuid4().hex[:8]}"
+                    self._fn_name_map[tc_id] = fc.name
                     canonical = _gemini_to_canonical(
                         fc.name, args, self.display_width, self.display_height
                     )
                     tool_calls.append(ProviderToolCall(
-                        id=f"gemini_{uuid.uuid4().hex[:8]}",
+                        id=tc_id,
                         name=canonical["name"],
                         input=canonical["input"],
                     ))
@@ -188,34 +230,28 @@ class GeminiProvider(BaseProvider):
                     ))
 
                 elif btype == "tool_use" and gemini_role == "model":
-                    # Reconstruct a function_call Part
+                    # Reconstruct a function_call Part using original Gemini name
+                    tc_id = block.get("id", "")
+                    original_name = self._fn_name_map.get(tc_id, block.get("name", ""))
                     parts.append(types.Part(
                         function_call=types.FunctionCall(
-                            name=block.get("name", ""),
+                            name=original_name,
                             args=block.get("input", {}),
                         )
                     ))
 
                 elif btype == "tool_result" and gemini_role == "user":
-                    # Convert tool result to function_response
+                    tc_id = block.get("tool_use_id", "")
+                    original_name = self._fn_name_map.get(tc_id, "computer_use")
                     result_text = self._extract_text_from_content(block.get("content", []))
-                    # Also extract screenshot if present
                     screenshot_bytes = self._extract_image_from_content(block.get("content", []))
-
-                    fr_parts = []
-                    if screenshot_bytes:
-                        fr_parts.append(types.Part.from_bytes(
-                            data=screenshot_bytes,
-                            mime_type="image/png",
-                        ))
 
                     parts.append(types.Part(
                         function_response=types.FunctionResponse(
-                            name="computer_use",
+                            name=original_name,
                             response={"output": result_text},
                         )
                     ))
-                    # Append screenshot as a separate part
                     if screenshot_bytes:
                         parts.append(types.Part.from_bytes(
                             data=screenshot_bytes,
