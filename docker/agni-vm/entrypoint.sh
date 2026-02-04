@@ -16,7 +16,7 @@ sleep 1
 # --- 3. Set up GCS credentials (if provided via app-secrets) ---
 if [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ]; then
   echo "[3/11] Writing GCS credentials..."
-  echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/gcs-credentials.json
+  echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 -d > /tmp/gcs-credentials.json
   export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcs-credentials.json
 fi
 
