@@ -19,6 +19,7 @@ from agnirudra.agni.tools import computer, bash_tool
 logger = logging.getLogger(__name__)
 
 MAX_SCREENSHOTS_IN_CONTEXT = 10
+TRACE_PATH = Path("/tmp/agent_trace.log")
 
 SYSTEM_PROMPT = """\
 You are Agni, an automated QA testing agent. You have a browser and a
@@ -263,6 +264,10 @@ def run_agent_loop(
         }
     ]
 
+    # Open trace file for writing agent reasoning
+    trace_file = open(TRACE_PATH, "w")
+    trace_file.write(f"=== Agni Agent Trace ===\nModel: {model}\n\n")
+
     for iteration in range(max_iterations):
         logger.info("Agent iteration %d/%d", iteration + 1, max_iterations)
 
@@ -272,15 +277,25 @@ def run_agent_loop(
 
         # Build assistant message from provider response
         assistant_content = provider.format_assistant_content(response)
+
+        # Log agent reasoning to trace
+        trace_file.write(f"--- Iteration {iteration + 1}/{max_iterations} ---\n")
         for text in response.text_blocks:
             logger.info("Agent: %s", text[:200])
+            trace_file.write(f"[THINKING] {text}\n")
 
         messages.append({"role": "assistant", "content": assistant_content})
 
         # If no tool calls, the agent is done
         if not response.tool_calls:
             logger.info("Agent stopped requesting tools")
+            trace_file.write("[STOP] No tool calls — agent stopped.\n\n")
             break
+
+        # Log tool calls to trace
+        for tc in response.tool_calls:
+            tc_input = {k: v for k, v in tc.input.items() if k != "text" or tc.name != "computer"}
+            trace_file.write(f"[TOOL] {tc.name}({json.dumps(tc_input)})\n")
 
         # Execute tool calls
         raw_results: list[dict] = []
@@ -295,6 +310,14 @@ def run_agent_loop(
                 "tool_call_id": tc.id,
                 "content": result_content,
             })
+
+        # Log tool results to trace (text only, skip images)
+        for raw in raw_results:
+            for block in raw["content"]:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    trace_file.write(f"[RESULT] {block['text'][:500]}\n")
+        trace_file.write("\n")
+        trace_file.flush()
 
         # Format results for the provider
         tool_results = provider.format_tool_results(raw_results)
@@ -340,6 +363,8 @@ def run_agent_loop(
         if response.stop_reason == "end_turn":
             logger.info("Agent ended turn")
             break
+
+    trace_file.close()
 
     # Read verdict
     verdict_path = Path("/tmp/verdict.json")
