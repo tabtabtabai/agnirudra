@@ -11,11 +11,19 @@ class AgniSettings(BaseSettings):
 
     model_config = {"env_prefix": "AGNI_"}
 
-    # Anthropic
-    anthropic_api_key: str = Field(description="Anthropic API key")
+    # API keys — only the one matching the model is required
+    anthropic_api_key: str = Field(
+        default="", description="Anthropic API key (for Claude models)"
+    )
+    nvidia_api_key: str = Field(
+        default="", description="NVIDIA Build API key (for Kimi K2.5)"
+    )
+    google_api_key: str = Field(
+        default="", description="Google AI API key (for Gemini models)"
+    )
     model: str = Field(
         default="claude-sonnet-4-5-20250929",
-        description="Claude model to use for all AI calls",
+        description="Model ID — provider auto-detected from prefix (claude-*, moonshotai/*, gemini-*)",
     )
 
     # Azure - identity

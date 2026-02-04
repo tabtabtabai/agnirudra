@@ -1,7 +1,7 @@
 """Computer-use agent loop.
 
 Runs inside the Azure VM Docker container. Drives a browser through the
-test plan using Anthropic's computer-use beta API.
+test plan using the configured model provider's API.
 """
 
 from __future__ import annotations
@@ -13,13 +13,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import anthropic
-
+from agnirudra.agni.providers import create_provider, get_api_key_env_var
 from agnirudra.agni.tools import computer, bash_tool
 
 logger = logging.getLogger(__name__)
 
-COMPUTER_USE_BETA = "computer-use-2025-01-24"
 MAX_SCREENSHOTS_IN_CONTEXT = 10
 
 SYSTEM_PROMPT = """\
@@ -50,7 +48,7 @@ CRITICAL RULES:
 ENVIRONMENT:
 - Use the `browser` command to open URLs (not chromium-browser directly).
 - The display is 1280x720. Take screenshots to see what's on screen.
-"""
+{provider_addendum}"""
 
 
 @dataclass
@@ -68,26 +66,6 @@ def _build_test_plan_text(test_plan: dict) -> str:
     for i, step in enumerate(test_plan.get("steps", []), 1):
         lines.append(f"  {i}. {step}")
     return "\n".join(lines)
-
-
-def _make_tools(width: int, height: int) -> list[dict]:
-    return [
-        {
-            "type": "computer_20250124",
-            "name": "computer",
-            "display_width_px": width,
-            "display_height_px": height,
-            "display_number": 1,
-        },
-        {
-            "type": "bash_20250124",
-            "name": "bash",
-        },
-        {
-            "type": "text_editor_20250728",
-            "name": "str_replace_based_edit_tool",
-        },
-    ]
 
 
 def _handle_tool_call(tool_use: dict) -> dict:
@@ -256,7 +234,7 @@ def run_agent_loop(
     test_password: str = "",
 ) -> Verdict:
     """Run the computer-use agent loop. Returns a Verdict."""
-    client = anthropic.Anthropic(api_key=api_key)
+    provider = create_provider(model, api_key, display_width, display_height)
 
     plan_text = _build_test_plan_text(test_plan)
     auth_section = _build_auth_section(test_email, test_password)
@@ -265,8 +243,8 @@ def run_agent_loop(
         test_plan=plan_text,
         auth_section=auth_section,
         start_url=start_url,
+        provider_addendum=provider.system_prompt_addendum(),
     )
-    tools = _make_tools(display_width, display_height)
 
     messages: list[dict] = [
         {
@@ -280,53 +258,36 @@ def run_agent_loop(
 
         messages = _truncate_old_screenshots(messages)
 
-        response = client.beta.messages.create(
-            model=model,
-            max_tokens=4096,
-            system=system,
-            tools=tools,
-            messages=messages,
-            betas=[COMPUTER_USE_BETA],
-        )
+        response = provider.create_message(system, messages)
 
-        # Collect assistant content blocks
-        assistant_content = []
-        tool_calls = []
-        for block in response.content:
-            if block.type == "text":
-                assistant_content.append({"type": "text", "text": block.text})
-                logger.info("Agent: %s", block.text[:200])
-            elif block.type == "tool_use":
-                assistant_content.append({
-                    "type": "tool_use",
-                    "id": block.id,
-                    "name": block.name,
-                    "input": block.input,
-                })
-                tool_calls.append(block)
+        # Build assistant message from provider response
+        assistant_content = provider.format_assistant_content(response)
+        for text in response.text_blocks:
+            logger.info("Agent: %s", text[:200])
 
         messages.append({"role": "assistant", "content": assistant_content})
 
         # If no tool calls, the agent is done
-        if not tool_calls:
+        if not response.tool_calls:
             logger.info("Agent stopped requesting tools")
             break
 
-        # Execute tool calls and build tool_result messages
-        tool_results = []
-        for tc in tool_calls:
+        # Execute tool calls
+        raw_results: list[dict] = []
+        for tc in response.tool_calls:
             result_content = _handle_tool_call({
                 "name": tc.name,
                 "input": tc.input,
             })
-            # Wrap in a list if it's a single dict
             if isinstance(result_content, dict):
                 result_content = [result_content]
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tc.id,
+            raw_results.append({
+                "tool_call_id": tc.id,
                 "content": result_content,
             })
+
+        # Format results for the provider
+        tool_results = provider.format_tool_results(raw_results)
 
         # Nudge agent to write verdict when running low on iterations
         remaining = max_iterations - iteration - 1
@@ -342,6 +303,23 @@ def run_agent_loop(
             })
 
         messages.append({"role": "user", "content": tool_results})
+
+        # For providers without native computer-use, forward the latest
+        # screenshot as a separate user message so the model can see it
+        if provider.needs_image_forwarding():
+            last_screenshot = None
+            for raw in raw_results:
+                for block in raw["content"]:
+                    if isinstance(block, dict) and block.get("type") == "image":
+                        last_screenshot = block
+            if last_screenshot:
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Here is the current screen:"},
+                        last_screenshot,
+                    ],
+                })
 
         # Check if verdict was already written (agent may have written it via bash)
         if Path("/tmp/verdict.json").exists():
@@ -369,13 +347,15 @@ def main() -> None:
     """Entry point when run inside the Docker container."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
-    api_key = os.environ.get("AGNI_ANTHROPIC_API_KEY", "")
     model = os.environ.get("AGNI_MODEL", "claude-sonnet-4-5-20250929")
     test_plan_raw = os.environ.get("TEST_PLAN", "{}")
     max_iter = int(os.environ.get("AGNI_MAX_AGENT_ITERATIONS", "30"))
 
+    # Resolve the correct API key for this model
+    api_key_env = get_api_key_env_var(model)
+    api_key = os.environ.get(api_key_env, "")
     if not api_key:
-        logger.error("AGNI_ANTHROPIC_API_KEY is required")
+        logger.error("%s is required for model %s", api_key_env, model)
         sys.exit(1)
 
     test_email = os.environ.get("AGNI_TEST_EMAIL", "")

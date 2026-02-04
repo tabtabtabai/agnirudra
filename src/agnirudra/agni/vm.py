@@ -149,7 +149,6 @@ def create_vm(
 
     # Build env file contents (KEY=VALUE, one per line)
     env_vars: dict[str, str] = {
-        "AGNI_ANTHROPIC_API_KEY": settings.anthropic_api_key,
         "AGNI_GITHUB_TOKEN": settings.github_token,
         "AGNI_GITHUB_REPOSITORY": settings.github_repository,
         "AGNI_PR_NUMBER": str(settings.pr_number),
@@ -162,6 +161,14 @@ def create_vm(
         "AGNI_MODEL": settings.model,
         "TEST_PLAN": test_plan_json,
     }
+
+    # Pass provider API keys (only the ones that are set)
+    if settings.anthropic_api_key:
+        env_vars["AGNI_ANTHROPIC_API_KEY"] = settings.anthropic_api_key
+    if settings.nvidia_api_key:
+        env_vars["AGNI_NVIDIA_API_KEY"] = settings.nvidia_api_key
+    if settings.google_api_key:
+        env_vars["AGNI_GOOGLE_API_KEY"] = settings.google_api_key
 
     # Add consumer app secrets
     if settings.app_secrets and settings.app_secrets.strip() != "{}":

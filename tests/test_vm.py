@@ -27,6 +27,8 @@ def _make_settings(**overrides):
         "vm_timeout_seconds": 600,
         "run_attempt": 1,
         "app_secrets": "{}",
+        "nvidia_api_key": "",
+        "google_api_key": "",
     }
     defaults.update(overrides)
     mock = MagicMock()

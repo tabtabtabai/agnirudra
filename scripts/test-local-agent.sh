@@ -3,6 +3,8 @@
 #
 # Usage:
 #   AGNI_ANTHROPIC_API_KEY=sk-ant-xxx ./scripts/test-local-agent.sh [url]
+#   AGNI_NVIDIA_API_KEY=nvapi-xxx AGNI_MODEL=moonshotai/kimi-k2.5 ./scripts/test-local-agent.sh [url]
+#   AGNI_GOOGLE_API_KEY=xxx AGNI_MODEL=gemini-2.5-computer-use-preview-10-2025 ./scripts/test-local-agent.sh [url]
 #
 # Arguments:
 #   url   The app URL to test (default: http://host.docker.internal:3000)
@@ -15,10 +17,17 @@ set -euo pipefail
 IMAGE="agnirudra-test"
 TEST_URL="${1:-http://host.docker.internal:3000}"
 OUTPUT_DIR="test-output"
+MODEL="${AGNI_MODEL:-claude-sonnet-4-5-20250929}"
 
-if [ -z "${AGNI_ANTHROPIC_API_KEY:-}" ]; then
-    echo "ERROR: AGNI_ANTHROPIC_API_KEY is required"
-    echo "Usage: AGNI_ANTHROPIC_API_KEY=sk-ant-xxx $0 [url]"
+# Determine which API key is needed based on model prefix
+if [[ "$MODEL" == claude-* ]]; then
+    [ -z "${AGNI_ANTHROPIC_API_KEY:-}" ] && { echo "ERROR: AGNI_ANTHROPIC_API_KEY required for $MODEL"; exit 1; }
+elif [[ "$MODEL" == moonshotai/* ]]; then
+    [ -z "${AGNI_NVIDIA_API_KEY:-}" ] && { echo "ERROR: AGNI_NVIDIA_API_KEY required for $MODEL"; exit 1; }
+elif [[ "$MODEL" == gemini-* ]]; then
+    [ -z "${AGNI_GOOGLE_API_KEY:-}" ] && { echo "ERROR: AGNI_GOOGLE_API_KEY required for $MODEL"; exit 1; }
+else
+    echo "ERROR: Unknown model prefix: $MODEL"
     exit 1
 fi
 
@@ -45,14 +54,17 @@ EOF
 )
 
 echo "Starting agent loop against ${TEST_URL}..."
+echo "Model: ${MODEL}"
 echo "Container: ${CONTAINER_NAME}"
 echo ""
 
 docker run --rm --name "$CONTAINER_NAME" \
     --add-host=host.docker.internal:host-gateway \
     --entrypoint bash \
-    -e AGNI_ANTHROPIC_API_KEY="$AGNI_ANTHROPIC_API_KEY" \
-    -e AGNI_MODEL="${AGNI_MODEL:-claude-sonnet-4-5-20250929}" \
+    -e AGNI_ANTHROPIC_API_KEY="${AGNI_ANTHROPIC_API_KEY:-}" \
+    -e AGNI_NVIDIA_API_KEY="${AGNI_NVIDIA_API_KEY:-}" \
+    -e AGNI_GOOGLE_API_KEY="${AGNI_GOOGLE_API_KEY:-}" \
+    -e AGNI_MODEL="$MODEL" \
     -e TEST_PLAN="$TEST_PLAN" \
     -e DISPLAY=:1 \
     -v "$(pwd)/$OUTPUT_DIR:/output" \
