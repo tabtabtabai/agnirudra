@@ -14,7 +14,7 @@ def _make_settings(**overrides):
         "github_token": "ghp-test",
         "github_repository": "tabtabtabai/test-repo",
         "pr_number": 42,
-        "model": "claude-opus-4-5-20251101",
+        "model": "claude-sonnet-4-5-20250929",
         "azure_subscription_id": "sub-123",
     }
     defaults.update(overrides)

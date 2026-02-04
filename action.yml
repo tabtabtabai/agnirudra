@@ -19,7 +19,7 @@ inputs:
   model:
     description: "Claude model ID to use"
     required: false
-    default: "claude-opus-4-5-20251101"
+    default: "claude-sonnet-4-5-20250929"
   app-secrets:
     description: "JSON object of env vars your app needs (DB URLs, API keys, etc.)"
     required: false

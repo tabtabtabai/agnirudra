@@ -1,4 +1,4 @@
-"""Opus 4.5 computer-use agent loop.
+"""Computer-use agent loop.
 
 Runs inside the Azure VM Docker container. Drives a browser through the
 test plan using Anthropic's computer-use beta API.
@@ -24,7 +24,7 @@ MAX_SCREENSHOTS_IN_CONTEXT = 10
 
 SYSTEM_PROMPT = """\
 You are Agni, an automated QA testing agent. You have a browser and a
-Linux desktop. Your job: visually verify that a PR's changes work.
+Linux desktop. Your job: VISUALLY verify that a PR's changes work.
 
 {auth_section}TEST PLAN:
 {test_plan}
@@ -32,11 +32,20 @@ Linux desktop. Your job: visually verify that a PR's changes work.
 INSTRUCTIONS:
 1. Open a browser by running: browser {start_url}
 2. If the app shows a login or sign-in page, log in using the credentials above.
-3. Follow the test steps one by one.
-4. After each step, observe the result on screen.
-5. When done, write your verdict to /tmp/verdict.json:
-   {{"passed": true/false, "summary": "what happened"}}
-6. If you cannot complete a step, note what went wrong and still write verdict.json.
+3. Follow the test steps one by one. Take a screenshot after each action.
+4. Make your pass/fail determination based on what you SEE on screen.
+5. As SOON as you can determine pass or fail, IMMEDIATELY write your verdict:
+   bash: cat > /tmp/verdict.json << 'VERDICT'
+   {{"passed": true/false, "summary": "one sentence explaining what you observed"}}
+   VERDICT
+6. If you cannot complete a step, write the verdict explaining what went wrong.
+
+CRITICAL RULES:
+- You are doing VISUAL verification only. Look at the screen.
+- Do NOT open browser dev tools, inspect elements, or examine the DOM.
+- Do NOT investigate the source code or run diagnostic commands.
+- Be efficient: navigate, observe, verdict. Do not over-explore.
+- Writing /tmp/verdict.json is MANDATORY. Never finish without it.
 
 ENVIRONMENT:
 - Use the `browser` command to open URLs (not chromium-browser directly).
@@ -319,7 +328,25 @@ def run_agent_loop(
                 "content": result_content,
             })
 
+        # Nudge agent to write verdict when running low on iterations
+        remaining = max_iterations - iteration - 1
+        if remaining == max_iterations // 4:
+            tool_results.append({
+                "type": "text",
+                "text": "REMINDER: You are running low on iterations. Write /tmp/verdict.json NOW with your pass/fail determination based on what you have observed so far.",
+            })
+        elif remaining <= 1:
+            tool_results.append({
+                "type": "text",
+                "text": "FINAL ITERATION. You MUST write /tmp/verdict.json immediately. Use the bash tool to write it now.",
+            })
+
         messages.append({"role": "user", "content": tool_results})
+
+        # Check if verdict was already written (agent may have written it via bash)
+        if Path("/tmp/verdict.json").exists():
+            logger.info("Verdict file detected, stopping agent loop")
+            break
 
         # Check stop reason
         if response.stop_reason == "end_turn":
@@ -343,7 +370,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
     api_key = os.environ.get("AGNI_ANTHROPIC_API_KEY", "")
-    model = os.environ.get("AGNI_MODEL", "claude-opus-4-5-20251101")
+    model = os.environ.get("AGNI_MODEL", "claude-sonnet-4-5-20250929")
     test_plan_raw = os.environ.get("TEST_PLAN", "{}")
     max_iter = int(os.environ.get("AGNI_MAX_AGENT_ITERATIONS", "30"))
 

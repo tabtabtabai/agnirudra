@@ -52,7 +52,7 @@ docker run --rm --name "$CONTAINER_NAME" \
     --add-host=host.docker.internal:host-gateway \
     --entrypoint bash \
     -e AGNI_ANTHROPIC_API_KEY="$AGNI_ANTHROPIC_API_KEY" \
-    -e AGNI_MODEL="${AGNI_MODEL:-claude-opus-4-5-20251101}" \
+    -e AGNI_MODEL="${AGNI_MODEL:-claude-sonnet-4-5-20250929}" \
     -e TEST_PLAN="$TEST_PLAN" \
     -e DISPLAY=:1 \
     -v "$(pwd)/$OUTPUT_DIR:/output" \

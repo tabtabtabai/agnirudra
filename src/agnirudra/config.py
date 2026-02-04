@@ -14,7 +14,7 @@ class AgniSettings(BaseSettings):
     # Anthropic
     anthropic_api_key: str = Field(description="Anthropic API key")
     model: str = Field(
-        default="claude-opus-4-5-20251101",
+        default="claude-sonnet-4-5-20250929",
         description="Claude model to use for all AI calls",
     )
 
