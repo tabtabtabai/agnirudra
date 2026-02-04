@@ -347,7 +347,7 @@ def main() -> None:
     """Entry point when run inside the Docker container."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
-    model = os.environ.get("AGNI_MODEL", "moonshotai/kimi-k2.5")
+    model = os.environ.get("AGNI_MODEL", "claude-sonnet-4-5-20250929")
     test_plan_raw = os.environ.get("TEST_PLAN", "{}")
     max_iter = int(os.environ.get("AGNI_MAX_AGENT_ITERATIONS", "30"))
 

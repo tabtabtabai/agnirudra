@@ -23,7 +23,7 @@ class AgniSettings(BaseSettings):
         default="", description="Google AI API key (for Gemini models)"
     )
     model: str = Field(
-        default="moonshotai/kimi-k2.5",
+        default="claude-sonnet-4-5-20250929",
         description="Model ID — provider auto-detected from prefix (claude-*, moonshotai/*, gemini-*)",
     )
 
