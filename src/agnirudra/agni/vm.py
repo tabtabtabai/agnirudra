@@ -247,8 +247,11 @@ def create_vm(
 
 def poll_for_completion(
     settings: AgniSettings, commit_hash: str, timeout: int | None = None
-) -> bool:
-    """Poll Azure Blob Storage for the done marker. Returns True if found."""
+) -> dict | None:
+    """Poll Azure Blob Storage for the done marker.
+
+    Returns the verdict dict if found, or None on timeout.
+    """
     credential = _get_credential(settings)
     blob_service = BlobServiceClient(
         account_url=f"https://{settings.azure_storage_account}.blob.core.windows.net",
@@ -263,14 +266,19 @@ def poll_for_completion(
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            container_client.get_blob_client(marker_blob).get_blob_properties()
+            blob_client = container_client.get_blob_client(marker_blob)
+            data = blob_client.download_blob().readall().decode()
             logger.info("Completion marker found: %s", marker_blob)
-            return True
+            try:
+                import json
+                return json.loads(data)
+            except (json.JSONDecodeError, ValueError):
+                return {"passed": True, "summary": data}
         except Exception:
             time.sleep(15)
 
     logger.warning("Timed out waiting for completion marker")
-    return False
+    return None
 
 
 def teardown_vm(settings: AgniSettings, commit_hash: str) -> None:

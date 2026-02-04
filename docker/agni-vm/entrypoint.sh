@@ -292,8 +292,8 @@ post_result(
     thumbnail_url=thumbnail_url,
 )
 
-# Write done marker
-write_done_marker(settings, commit_hash)
+# Write done marker (include verdict so orchestrator can check pass/fail)
+write_done_marker(settings, commit_hash, json.dumps(verdict))
 print('Done! Results posted to PR.')
 "
 
