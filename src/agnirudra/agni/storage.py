@@ -169,11 +169,17 @@ def _build_player_html(recording_url: str) -> str:
 </html>"""
 
 
-def write_done_marker(settings: AgniSettings, commit_hash: str) -> None:
-    """Write a done.marker blob so the orchestrator knows we finished."""
+def write_done_marker(
+    settings: AgniSettings, commit_hash: str, verdict_json: str = "done"
+) -> None:
+    """Write a done.marker blob so the orchestrator knows we finished.
+
+    The marker content is the verdict JSON so the orchestrator can
+    read the pass/fail result without a separate blob.
+    """
     blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/done.marker"
     blob_service = _get_blob_service(settings)
     container = blob_service.get_container_client(settings.azure_storage_container)
     blob_client = container.get_blob_client(blob_path)
-    blob_client.upload_blob(b"done", overwrite=True)
+    blob_client.upload_blob(verdict_json.encode(), overwrite=True)
     logger.info("Wrote completion marker: %s", blob_path)

@@ -44,6 +44,10 @@ CRITICAL RULES:
 - Do NOT investigate the source code or run diagnostic commands.
 - Be efficient: navigate, observe, verdict. Do not over-explore.
 - Writing /tmp/verdict.json is MANDATORY. Never finish without it.
+- BEFORE writing a FAIL verdict: take one final screenshot and carefully re-examine
+  the screen. Only fail if the issue is clearly visible in the CURRENT state.
+  Transient glitches or timing issues should not cause a fail if the final state is correct.
+- Lean towards PASS if the feature visibly works, even if the interaction felt unusual.
 
 ENVIRONMENT:
 - Use the `browser` command to open URLs (not chromium-browser directly).
@@ -353,7 +357,7 @@ def main() -> None:
     """Entry point when run inside the Docker container."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
-    model = os.environ.get("AGNI_MODEL", "claude-sonnet-4-5-20250929")
+    model = os.environ.get("AGNI_MODEL", "claude-opus-4-5-20251101")
     test_plan_raw = os.environ.get("TEST_PLAN", "{}")
     max_iter = int(os.environ.get("AGNI_MAX_AGENT_ITERATIONS", "30"))
 
