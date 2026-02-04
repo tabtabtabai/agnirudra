@@ -11,9 +11,10 @@ class AgniSettings(BaseSettings):
 
     model_config = {"env_prefix": "AGNI_"}
 
-    # API keys — only the one matching the model is required
+    # API keys — Anthropic is always required (used for planning).
+    # The vision model key is only needed if model != claude-*.
     anthropic_api_key: str = Field(
-        default="", description="Anthropic API key (for Claude models)"
+        description="Anthropic API key (always required for test plan generation)"
     )
     nvidia_api_key: str = Field(
         default="", description="NVIDIA Build API key (for Kimi K2.5)"

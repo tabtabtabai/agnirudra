@@ -1,4 +1,4 @@
-"""Analyze a PR diff and generate a TestPlan using Claude."""
+"""Analyze a PR diff and generate a TestPlan."""
 
 from __future__ import annotations
 
@@ -9,6 +9,9 @@ import anthropic
 from github import Github
 
 from agnirudra.config import AgniSettings
+
+# Planning always uses Claude — it's a text-only task.
+PLANNING_MODEL = "claude-sonnet-4-5-20250929"
 
 SYSTEM_PROMPT = """\
 You are a QA analyst. Given a pull request diff and commit messages, determine:
@@ -64,14 +67,18 @@ def fetch_pr_context(settings: AgniSettings) -> tuple[str, str]:
 
 
 def generate_test_plan(settings: AgniSettings) -> TestPlan:
-    """Fetch PR context and ask Claude to produce a TestPlan."""
+    """Fetch PR context and ask Claude to produce a TestPlan.
+
+    Always uses Claude for planning (text-only task), regardless of which
+    model is configured for the computer-use agent loop.
+    """
     diff, commits = fetch_pr_context(settings)
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     user_msg = f"## Commit messages\n{commits}\n\n## Diff\n{diff}"
 
     response = client.messages.create(
-        model=settings.model,
+        model=PLANNING_MODEL,
         max_tokens=2048,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_msg}],

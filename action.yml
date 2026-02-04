@@ -4,9 +4,8 @@ author: "tabtabtabai"
 
 inputs:
   anthropic-api-key:
-    description: "Anthropic API key (required for Claude models)"
-    required: false
-    default: ""
+    description: "Anthropic API key (always required for test plan generation)"
+    required: true
   nvidia-api-key:
     description: "NVIDIA Build API key (required for Kimi K2.5)"
     required: false
