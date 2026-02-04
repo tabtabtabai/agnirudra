@@ -13,17 +13,8 @@ echo "[2/10] Starting openbox..."
 DISPLAY=:1 openbox &
 sleep 1
 
-# --- 3. Start screen recording ---
-echo "[3/10] Starting FFmpeg screen recording..."
-DISPLAY=:1 ffmpeg -y \
-  -f x11grab -video_size 1280x720 -framerate 15 -i :1 \
-  -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p \
-  /tmp/recording.mp4 &
-FFMPEG_PID=$!
-sleep 1
-
-# --- 4. Clone repo and checkout PR branch ---
-echo "[4/10] Cloning repository..."
+# --- 3. Clone repo and checkout PR branch ---
+echo "[3/10] Cloning repository..."
 REPO_URL="https://x-access-token:${AGNI_GITHUB_TOKEN}@github.com/${AGNI_GITHUB_REPOSITORY}.git"
 git clone --depth=50 "$REPO_URL" /workspace
 cd /workspace
@@ -38,8 +29,8 @@ git fetch origin "+refs/heads/$PR_REF:refs/remotes/origin/$PR_REF"
 git checkout -b "$PR_REF" "origin/$PR_REF"
 echo "Checked out branch: $PR_REF (commit: ${COMMIT_SHA:0:8})"
 
-# --- 5. Start services ---
-echo "[5/10] Starting services..."
+# --- 4. Start services ---
+echo "[4/10] Starting services..."
 
 # Install pyyaml for config parsing
 pip install pyyaml -q 2>/dev/null || true
@@ -142,8 +133,8 @@ if ! start_services; then
   exit 1
 fi
 
-# --- 6. Wait for app to be ready ---
-echo "[6/10] Waiting for services to be ready..."
+# --- 5. Wait for app to be ready ---
+echo "[5/10] Waiting for services to be ready..."
 
 # Parse the test_target port from .agni.yml, or check common ports
 if [ -f .agni.yml ]; then
@@ -203,7 +194,7 @@ done
 
 echo "Service readiness check complete."
 
-# --- 6b. Override start_url from .agni.yml test_target ---
+# --- 6. Override start_url from .agni.yml test_target ---
 if [ -f .agni.yml ]; then
   START_URL=$(python3 -c "
 import yaml, json, os
@@ -224,25 +215,34 @@ print(json.dumps(plan))
   echo "Overrode start_url from .agni.yml: $(echo "$TEST_PLAN" | python3 -c 'import sys,json;print(json.load(sys.stdin).get(\"start_url\",\"?\"))')"
 fi
 
-# --- 7. Run the agent loop ---
-echo "[7/10] Running Agni agent loop..."
+# --- 7. Start screen recording (right before agent so we don't record blank startup) ---
+echo "[7/10] Starting screen recording..."
+DISPLAY=:1 ffmpeg -y \
+  -f x11grab -video_size 1280x720 -framerate 15 -i :1 \
+  -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p \
+  /tmp/recording.mp4 &
+FFMPEG_PID=$!
+sleep 1
+
+# --- 8. Run the agent loop ---
+echo "[8/10] Running Agni agent loop..."
 DISPLAY=:1 python -m agnirudra.agni.agent_loop || {
   echo "WARNING: Agent loop exited with code $?"
 }
 
-# --- 8. Stop recording ---
-echo "[8/10] Stopping screen recording..."
+# --- 9. Stop recording ---
+echo "[9/10] Stopping screen recording..."
 kill -INT "$FFMPEG_PID" 2>/dev/null || true
 sleep 3
 wait "$FFMPEG_PID" 2>/dev/null || true
 
-# --- 8b. Extract thumbnail ---
+# --- 9b. Extract thumbnail ---
 echo "Extracting thumbnail from recording..."
 ffmpeg -y -sseof -3 -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || \
   ffmpeg -y -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || true
 
-# --- 9. Upload recording ---
-echo "[9/10] Uploading recording to Azure Blob Storage..."
+# --- 10. Upload recording ---
+echo "[10/10] Uploading recording to Azure Blob Storage..."
 python3 -c "
 import json
 from pathlib import Path
@@ -290,4 +290,4 @@ write_done_marker(settings, commit_hash)
 print('Done! Results posted to PR.')
 "
 
-echo "[10/10] Complete. Exiting."
+echo "Complete. Exiting."
