@@ -3,8 +3,14 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:1
 
-# System dependencies
+# System dependencies + PPAs (deadsnakes for python3.11, mozillateam for firefox-esr)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    ca-certificates \
+    gnupg \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && add-apt-repository -y ppa:mozillateam/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     openbox \
     ffmpeg \
@@ -17,14 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
     python3-pip \
-    ca-certificates \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Firefox ESR (the apt firefox on 22.04 is a snap stub that doesn't work in Docker)
-RUN apt-get update && apt-get install -y software-properties-common \
-    && add-apt-repository -y ppa:mozillateam/ppa \
-    && apt-get update && apt-get install -y firefox-esr \
+    firefox-esr \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js 20 (for JS app support)
