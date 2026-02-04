@@ -169,6 +169,19 @@ def _build_player_html(recording_url: str) -> str:
 </html>"""
 
 
+def delete_done_marker(settings: AgniSettings, commit_hash: str) -> None:
+    """Delete any existing done.marker so stale results aren't picked up."""
+    blob_path = f"pr-{settings.pr_number}/{commit_hash[:8]}/done.marker"
+    blob_service = _get_blob_service(settings)
+    container = blob_service.get_container_client(settings.azure_storage_container)
+    blob_client = container.get_blob_client(blob_path)
+    try:
+        blob_client.delete_blob()
+        logger.info("Deleted stale done marker: %s", blob_path)
+    except Exception:
+        pass  # Marker didn't exist, nothing to clean up
+
+
 def write_done_marker(
     settings: AgniSettings, commit_hash: str, verdict_json: str = "done"
 ) -> None:
