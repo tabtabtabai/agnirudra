@@ -16,7 +16,7 @@ import sys
 
 from github import Github
 
-from agnirudra.agni import github_reporter, trigger, vm
+from agnirudra.agni import github_reporter, storage, trigger, vm
 from agnirudra.config import AgniSettings
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,10 @@ def run() -> None:
     logger.info("Test plan: %s", test_plan.description)
     logger.info("Steps: %s", test_plan.steps)
 
-    # Step 3: Create Azure VM
+    # Step 3: Clean up any stale done marker from previous runs
+    storage.delete_done_marker(settings, commit_hash)
+
+    # Step 4: Create Azure VM
     logger.info("Creating Azure VM...")
     try:
         vm_name = vm.create_vm(settings, test_plan, commit_hash)
