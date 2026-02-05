@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openbox \
     ffmpeg \
     xdotool \
+    xclip \
     scrot \
     git \
     curl \
@@ -52,7 +53,10 @@ user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);\n\
 user_pref("datareporting.policy.dataSubmissionEnabled", false);\n\
 user_pref("browser.aboutConfig.showWarning", false);\n\
 user_pref("browser.newtabpage.enabled", false);\n\
-user_pref("browser.startup.homepage", "about:blank");\n' \
+user_pref("browser.startup.homepage", "about:blank");\n\
+user_pref("security.sandbox.warn_unprivileged_namespaces", false);\n\
+user_pref("browser.aboutwelcome.enabled", false);\n\
+user_pref("browser.messaging-system.whatsNewPanel.enabled", false);\n' \
     > "$PROFILE_DIR/user.js" && \
     printf '\n[Profile0]\nName=default\nIsRelative=1\nPath=default\nDefault=1\n' \
     >> /root/.mozilla/firefox/profiles.ini
