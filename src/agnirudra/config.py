@@ -27,8 +27,16 @@ class AgniSettings(BaseSettings):
         description="Model ID — provider auto-detected from prefix (claude-*, moonshotai/*, gemini-*)",
     )
 
-    # Azure - identity
-    azure_subscription_id: str = Field(description="Azure subscription ID")
+    # Cloud provider selection
+    cloud_provider: str = Field(
+        default="azure",
+        description="Cloud provider for VMs and storage: 'azure' or 'hetzner'",
+    )
+
+    # Azure - identity (required when cloud_provider=azure)
+    azure_subscription_id: str = Field(
+        default="", description="Azure subscription ID"
+    )
     azure_tenant_id: str = Field(default="", description="Azure tenant ID")
     azure_client_id: str = Field(default="", description="Azure SP client ID")
     azure_client_secret: str = Field(default="", description="Azure SP client secret")
@@ -48,6 +56,38 @@ class AgniSettings(BaseSettings):
         default="recordings", description="Azure blob container name"
     )
 
+    # Hetzner - API (required when cloud_provider=hetzner)
+    hetzner_api_token: str = Field(
+        default="", description="Hetzner Cloud API token"
+    )
+    hetzner_location: str = Field(
+        default="fsn1", description="Hetzner datacenter location (fsn1, nbg1, hel1, ash, hil)"
+    )
+    hetzner_server_type: str = Field(
+        default="cpx31", description="Hetzner server type (cpx31 = 4 vCPU, 8GB RAM)"
+    )
+    hetzner_image: str = Field(
+        default="ubuntu-22.04", description="Hetzner OS image"
+    )
+
+    # Hetzner - S3-compatible Object Storage
+    hetzner_s3_endpoint: str = Field(
+        default="https://fsn1.your-objectstorage.com",
+        description="Hetzner Object Storage endpoint URL",
+    )
+    hetzner_s3_region: str = Field(
+        default="fsn1", description="Hetzner Object Storage region"
+    )
+    hetzner_s3_access_key: str = Field(
+        default="", description="Hetzner Object Storage access key"
+    )
+    hetzner_s3_secret_key: str = Field(
+        default="", description="Hetzner Object Storage secret key"
+    )
+    hetzner_s3_bucket: str = Field(
+        default="agnirudra-recordings", description="Hetzner Object Storage bucket name"
+    )
+
     # GitHub
     github_token: str = Field(description="GitHub token for API access")
     github_repository: str = Field(
@@ -55,10 +95,10 @@ class AgniSettings(BaseSettings):
     )
     pr_number: int = Field(description="Pull request number to test")
 
-    # Docker image
+    # Docker image (set to your organization's image registry)
     docker_image: str = Field(
-        default="ghcr.io/tabtabtabai/agnirudra:latest",
-        description="Docker image for the test VM",
+        default="",
+        description="Docker image for the test VM (e.g., ghcr.io/your-org/agnirudra:latest)",
     )
 
     # Pre-baked VM image (optional, speeds up boot by ~1.5-2 min)

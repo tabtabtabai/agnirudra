@@ -9,13 +9,16 @@
 #   - The agnirudra-rg resource group exists (run setup-azure.sh first)
 #
 # Usage:
-#   ./scripts/build-vm-image.sh [docker-image] [resource-group] [location]
+#   ./scripts/build-vm-image.sh <docker-image> [resource-group] [location]
+#
+# Example:
+#   ./scripts/build-vm-image.sh ghcr.io/your-org/agnirudra:latest
 #
 # Re-run this script whenever the Docker image is updated.
 
 set -euo pipefail
 
-DOCKER_IMAGE="${1:-ghcr.io/tabtabtabai/agnirudra:latest}"
+DOCKER_IMAGE="${1:?Usage: $0 <docker-image> [resource-group] [location]}"
 RESOURCE_GROUP="${2:-agnirudra-rg}"
 LOCATION="${3:-eastus}"
 IMAGE_NAME="agnirudra-vm-image"

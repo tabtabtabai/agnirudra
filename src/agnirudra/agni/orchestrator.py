@@ -3,7 +3,7 @@
 1. Fetch PR diff + commit messages
 2. Generate a TestPlan via Claude
 3. If no UI changes, post skip comment and exit
-4. Create Azure VM (runs the Docker container with the agent)
+4. Create VM (Azure or Hetzner) that runs the Docker container with the agent
 5. Poll for completion
 6. Teardown VM
 """
@@ -13,29 +13,34 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+from typing import TYPE_CHECKING
 
 from github import Github
 
-from agnirudra.agni import github_reporter, storage, trigger, vm
+from agnirudra.agni import github_reporter, trigger
+from agnirudra.agni.cloud import create_cloud_provider
 from agnirudra.config import AgniSettings
+
+if TYPE_CHECKING:
+    from agnirudra.agni.cloud.base import CloudProvider
 
 logger = logging.getLogger(__name__)
 
+# Module-level variable to hold the cloud provider for signal handlers
+_cloud_provider: CloudProvider | None = None
+_commit_hash: str | None = None
 
-def _teardown_on_signal(settings: AgniSettings, commit_hash: str) -> None:
-    """Register signal handlers so teardown runs even if the job is cancelled."""
 
-    def _handler(signum: int, _frame: object) -> None:
-        sig_name = signal.Signals(signum).name
-        logger.warning("Received %s — tearing down VM before exit", sig_name)
+def _teardown_on_signal(signum: int, _frame: object) -> None:
+    """Signal handler that tears down VM on job cancellation."""
+    sig_name = signal.Signals(signum).name
+    logger.warning("Received %s — tearing down VM before exit", sig_name)
+    if _cloud_provider and _commit_hash:
         try:
-            vm.teardown_vm(settings, commit_hash)
+            _cloud_provider.teardown_vm(_commit_hash)
         except Exception as exc:
             logger.warning("Teardown on signal failed: %s", exc)
-        sys.exit(1)
-
-    signal.signal(signal.SIGTERM, _handler)
-    signal.signal(signal.SIGINT, _handler)
+    sys.exit(1)
 
 
 def _get_head_commit(settings: AgniSettings) -> tuple[str, str]:
@@ -50,6 +55,8 @@ def _get_head_commit(settings: AgniSettings) -> tuple[str, str]:
 
 def run() -> None:
     """Main orchestrator entry point."""
+    global _cloud_provider, _commit_hash
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -64,6 +71,7 @@ def run() -> None:
         sys.exit(1)
 
     commit_hash, commit_message = _get_head_commit(settings)
+    _commit_hash = commit_hash
     logger.info("PR #%d, head commit: %s", settings.pr_number, commit_hash[:8])
 
     # Step 1: Generate test plan
@@ -86,13 +94,16 @@ def run() -> None:
     logger.info("Test plan: %s", test_plan.description)
     logger.info("Steps: %s", test_plan.steps)
 
-    # Step 3: Clean up any stale done marker from previous runs
-    storage.delete_done_marker(settings, commit_hash)
+    # Step 3: Create cloud provider and clean up stale markers
+    logger.info("Using cloud provider: %s", settings.cloud_provider)
+    cloud = create_cloud_provider(settings)
+    _cloud_provider = cloud
+    cloud.delete_done_marker(commit_hash)
 
-    # Step 4: Create Azure VM
-    logger.info("Creating Azure VM...")
+    # Step 4: Create VM
+    logger.info("Creating VM...")
     try:
-        vm_name = vm.create_vm(settings, test_plan, commit_hash)
+        vm_name = cloud.create_vm(test_plan, commit_hash)
     except Exception as exc:
         logger.error("Failed to create VM: %s", exc)
         github_reporter.post_error(settings, f"Failed to create test VM: {exc}")
@@ -101,16 +112,17 @@ def run() -> None:
     logger.info("VM created: %s", vm_name)
 
     # Register signal handlers so teardown runs on job cancellation
-    _teardown_on_signal(settings, commit_hash)
+    signal.signal(signal.SIGTERM, _teardown_on_signal)
+    signal.signal(signal.SIGINT, _teardown_on_signal)
 
-    # Step 4: Poll for completion
+    # Step 5: Poll for completion
     logger.info("Waiting for test completion (timeout=%ds)...", settings.vm_timeout_seconds)
-    verdict = vm.poll_for_completion(settings, commit_hash)
+    verdict = cloud.poll_for_completion(commit_hash)
 
-    # Step 5: Teardown
+    # Step 6: Teardown
     logger.info("Tearing down VM...")
     try:
-        vm.teardown_vm(settings, commit_hash)
+        cloud.teardown_vm(commit_hash)
     except Exception as exc:
         logger.warning("VM teardown error (non-fatal): %s", exc)
 

@@ -254,38 +254,41 @@ ffmpeg -y -sseof -3 -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 
   ffmpeg -y -i /tmp/recording.mp4 -frames:v 1 -q:v 2 /tmp/thumbnail.jpg 2>/dev/null || true
 
 # --- 12. Upload recording ---
-echo "[12/12] Uploading recording to Azure Blob Storage..."
+echo "[12/12] Uploading recording to object storage..."
 python3 -c "
 import json
 from pathlib import Path
-from agnirudra.agni.storage import upload_recording, upload_thumbnail, upload_trace, upload_player_page, generate_sas_url, write_done_marker
+from agnirudra.agni.cloud import create_cloud_provider
 from agnirudra.config import AgniSettings
 from agnirudra.agni.github_reporter import post_result, post_error
 
 settings = AgniSettings()
 commit_hash = '${COMMIT_SHA}'
 
+# Create cloud provider based on settings
+cloud = create_cloud_provider(settings)
+
 # Upload recording
-blob_path = upload_recording(settings, Path('/tmp/recording.mp4'), commit_hash)
-recording_url = generate_sas_url(settings, blob_path)
+blob_path = cloud.upload_recording(Path('/tmp/recording.mp4'), commit_hash)
+recording_url = cloud.generate_public_url(blob_path)
 
 # Upload thumbnail if it exists
 thumbnail_url = ''
 thumb_path = Path('/tmp/thumbnail.jpg')
 if thumb_path.exists():
-    thumb_blob = upload_thumbnail(settings, thumb_path, commit_hash)
-    thumbnail_url = generate_sas_url(settings, thumb_blob)
+    thumb_blob = cloud.upload_thumbnail(thumb_path, commit_hash)
+    thumbnail_url = cloud.generate_public_url(thumb_blob)
 
 # Upload agent trace if it exists
 trace_url = ''
 trace_path = Path('/tmp/agent_trace.log')
 if trace_path.exists() and trace_path.stat().st_size > 0:
-    trace_blob = upload_trace(settings, trace_path, commit_hash)
-    trace_url = generate_sas_url(settings, trace_blob)
+    trace_blob = cloud.upload_trace(trace_path, commit_hash)
+    trace_url = cloud.generate_public_url(trace_blob)
 
 # Upload HTML video player page so clicking opens a player instead of downloading
-player_blob = upload_player_page(settings, recording_url, commit_hash)
-player_url = generate_sas_url(settings, player_blob)
+player_blob = cloud.upload_player_page(recording_url, commit_hash)
+player_url = cloud.generate_public_url(player_blob)
 
 # Read verdict
 verdict = {'passed': False, 'summary': 'Agent did not produce a verdict'}
@@ -306,7 +309,7 @@ post_result(
 )
 
 # Write done marker (include verdict so orchestrator can check pass/fail)
-write_done_marker(settings, commit_hash, json.dumps(verdict))
+cloud.write_done_marker(commit_hash, json.dumps(verdict))
 print('Done! Results posted to PR.')
 "
 

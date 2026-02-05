@@ -102,17 +102,18 @@ else
     --yes
 fi
 
-# Create databases (idempotent)
-echo "Ensuring databases exist..."
+# Create example database (customize for your app)
+echo "Creating example database..."
 az postgres flexible-server db create \
   --resource-group "$RESOURCE_GROUP" \
   --server-name "$PG_SERVER" \
-  --database-name "tabtabtab-sheets" 2>/dev/null || true
+  --database-name "agnirudra-app" 2>/dev/null || true
 
-az postgres flexible-server db create \
-  --resource-group "$RESOURCE_GROUP" \
-  --server-name "$PG_SERVER" \
-  --database-name "tabtabtab-spreadjs-collab" 2>/dev/null || true
+# NOTE: Add your own databases here if needed:
+# az postgres flexible-server db create \
+#   --resource-group "$RESOURCE_GROUP" \
+#   --server-name "$PG_SERVER" \
+#   --database-name "your-database-name" 2>/dev/null || true
 
 echo "Ensuring firewall rules exist..."
 az postgres flexible-server firewall-rule create \
@@ -166,10 +167,10 @@ echo "--- PostgreSQL ---"
 echo "  Server:   ${PG_SERVER}.postgres.database.azure.com"
 echo "  Admin:    $PG_ADMIN_USER"
 echo "  Password: $PG_ADMIN_PASS"
-echo "  Backend DB URL:"
-echo "    postgresql://${PG_ADMIN_USER}:${PG_ADMIN_PASS}@${PG_SERVER}.postgres.database.azure.com:5432/tabtabtab-sheets?sslmode=require"
-echo "  SpreadJS Collab DB URL:"
-echo "    postgresql://${PG_ADMIN_USER}:${PG_ADMIN_PASS}@${PG_SERVER}.postgres.database.azure.com:5432/tabtabtab-spreadjs-collab?sslmode=require"
+echo "  Example DB URL:"
+echo "    postgresql://${PG_ADMIN_USER}:${PG_ADMIN_PASS}@${PG_SERVER}.postgres.database.azure.com:5432/agnirudra-app?sslmode=require"
+echo ""
+echo "  (Add your own databases using az postgres flexible-server db create)"
 echo ""
 echo "--- Redis ---"
 echo "  Host: ${REDIS_NAME}.redis.cache.windows.net"
