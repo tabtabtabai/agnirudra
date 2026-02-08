@@ -85,17 +85,9 @@ def generate_test_plan(settings: AgniSettings) -> TestPlan:
     )
 
     text = response.content[0].text
-
-    # Extract JSON — handle raw JSON, code-fenced JSON, or JSON buried in prose
-    import re
-    fence_match = re.search(r"```(?:json)?\s*\n(.+?)```", text, re.DOTALL)
-    if fence_match:
-        text = fence_match.group(1)
-    elif not text.lstrip().startswith("{"):
-        # Last resort: find the first { ... } block
-        brace_match = re.search(r"\{.+\}", text, re.DOTALL)
-        if brace_match:
-            text = brace_match.group(0)
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
 
     data = json.loads(text)
     return TestPlan(**data)
