@@ -1,6 +1,6 @@
 name: "Agni Visual Test"
 description: "AI-powered visual QA testing for pull requests"
-author: "tabtabtabai"
+author: "agnirudra"
 
 inputs:
   anthropic-api-key:
@@ -14,9 +14,6 @@ inputs:
     description: "Google AI API key (required for Gemini models)"
     required: false
     default: ""
-  azure-credentials:
-    description: "Azure service principal credentials JSON"
-    required: true
   github-token:
     description: "GitHub token for posting PR comments"
     required: true
@@ -36,10 +33,59 @@ inputs:
     description: "Skip the 'no UI changes' check and always run the test"
     required: false
     default: "false"
+  docker-image:
+    description: "Docker image for the test VM (e.g., ghcr.io/your-org/agnirudra:latest)"
+    required: true
+
+  # Cloud provider selection
+  cloud-provider:
+    description: "Cloud provider: 'azure' or 'hetzner'"
+    required: false
+    default: "azure"
+
+  # Azure credentials (required when cloud-provider=azure)
+  azure-credentials:
+    description: "Azure service principal credentials JSON (required for Azure)"
+    required: false
+    default: "{}"
   vm-image:
     description: "Azure managed image ID (from build-vm-image.sh) for faster VM boot"
     required: false
     default: ""
+
+  # Hetzner credentials (required when cloud-provider=hetzner)
+  hetzner-api-token:
+    description: "Hetzner Cloud API token (required for Hetzner)"
+    required: false
+    default: ""
+  hetzner-s3-endpoint:
+    description: "Hetzner Object Storage endpoint URL"
+    required: false
+    default: "https://fsn1.your-objectstorage.com"
+  hetzner-s3-region:
+    description: "Hetzner Object Storage region"
+    required: false
+    default: "fsn1"
+  hetzner-s3-access-key:
+    description: "Hetzner Object Storage access key"
+    required: false
+    default: ""
+  hetzner-s3-secret-key:
+    description: "Hetzner Object Storage secret key"
+    required: false
+    default: ""
+  hetzner-s3-bucket:
+    description: "Hetzner Object Storage bucket name"
+    required: false
+    default: "agnirudra-recordings"
+  hetzner-location:
+    description: "Hetzner datacenter location (fsn1, nbg1, hel1, ash, hil)"
+    required: false
+    default: "fsn1"
+  hetzner-server-type:
+    description: "Hetzner server type (e.g., cpx31 = 4 vCPU, 8GB RAM)"
+    required: false
+    default: "cpx31"
 
 runs:
   using: "composite"
@@ -61,30 +107,47 @@ runs:
     - name: Parse Azure credentials
       shell: bash
       id: azure
+      if: ${{ inputs.cloud-provider == 'azure' }}
       run: |
-        echo "AZURE_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> "$GITHUB_ENV"
-        echo "AZURE_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> "$GITHUB_ENV"
-        echo "AZURE_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> "$GITHUB_ENV"
-        echo "AZURE_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> "$GITHUB_ENV"
+        echo "AZURE_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r '.tenantId // empty')" >> "$GITHUB_ENV"
+        echo "AZURE_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r '.clientId // empty')" >> "$GITHUB_ENV"
+        echo "AZURE_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r '.clientSecret // empty')" >> "$GITHUB_ENV"
+        echo "AZURE_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r '.subscriptionId // empty')" >> "$GITHUB_ENV"
 
     - name: Run Agni orchestrator
       shell: bash
       working-directory: ${{ github.action_path }}
       env:
+        # API keys
         AGNI_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         AGNI_NVIDIA_API_KEY: ${{ inputs.nvidia-api-key }}
         AGNI_GOOGLE_API_KEY: ${{ inputs.google-api-key }}
+        # GitHub
         AGNI_GITHUB_TOKEN: ${{ inputs.github-token }}
         AGNI_GITHUB_REPOSITORY: ${{ github.repository }}
         AGNI_PR_NUMBER: ${{ github.event.pull_request.number }}
-        AGNI_AZURE_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
-        AGNI_AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
-        AGNI_AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
-        AGNI_AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
+        # Model & settings
         AGNI_MODEL: ${{ inputs.model }}
         AGNI_BRANCH_FILTER: ${{ inputs.branch-filter }}
         AGNI_APP_SECRETS: ${{ inputs.app-secrets }}
         AGNI_RUN_ATTEMPT: ${{ github.run_attempt }}
         AGNI_FORCE_RUN: ${{ inputs.force-run }}
+        AGNI_DOCKER_IMAGE: ${{ inputs.docker-image }}
+        # Cloud provider
+        AGNI_CLOUD_PROVIDER: ${{ inputs.cloud-provider }}
+        # Azure (only used when cloud-provider=azure)
+        AGNI_AZURE_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+        AGNI_AZURE_TENANT_ID: ${{ env.AZURE_TENANT_ID }}
+        AGNI_AZURE_CLIENT_ID: ${{ env.AZURE_CLIENT_ID }}
+        AGNI_AZURE_CLIENT_SECRET: ${{ env.AZURE_CLIENT_SECRET }}
         AGNI_AZURE_VM_IMAGE: ${{ inputs.vm-image }}
+        # Hetzner (only used when cloud-provider=hetzner)
+        AGNI_HETZNER_API_TOKEN: ${{ inputs.hetzner-api-token }}
+        AGNI_HETZNER_S3_ENDPOINT: ${{ inputs.hetzner-s3-endpoint }}
+        AGNI_HETZNER_S3_REGION: ${{ inputs.hetzner-s3-region }}
+        AGNI_HETZNER_S3_ACCESS_KEY: ${{ inputs.hetzner-s3-access-key }}
+        AGNI_HETZNER_S3_SECRET_KEY: ${{ inputs.hetzner-s3-secret-key }}
+        AGNI_HETZNER_S3_BUCKET: ${{ inputs.hetzner-s3-bucket }}
+        AGNI_HETZNER_LOCATION: ${{ inputs.hetzner-location }}
+        AGNI_HETZNER_SERVER_TYPE: ${{ inputs.hetzner-server-type }}
       run: poetry run python -m agnirudra.agni.orchestrator

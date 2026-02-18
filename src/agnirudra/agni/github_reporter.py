@@ -22,7 +22,7 @@ REPORT_TEMPLATE = """\
 **Recording**: [![Watch test session]({thumbnail_url})]({recording_url})
 {trace_line}
 ---
-*Tested by [Agni](https://github.com/tabtabtabai/agnirudra)*\
+*Tested by [Agni](https://github.com/anthropics/agnirudra)*\
 """
 
 SKIP_TEMPLATE = """\
@@ -31,7 +31,7 @@ SKIP_TEMPLATE = """\
 **Status**: SKIPPED -- {reason}
 
 ---
-*Tested by [Agni](https://github.com/tabtabtabai/agnirudra)*\
+*Tested by [Agni](https://github.com/anthropics/agnirudra)*\
 """
 
 ERROR_TEMPLATE = """\
@@ -42,7 +42,7 @@ ERROR_TEMPLATE = """\
 {recording_line}
 
 ---
-*Tested by [Agni](https://github.com/tabtabtabai/agnirudra)*\
+*Tested by [Agni](https://github.com/anthropics/agnirudra)*\
 """
 
 

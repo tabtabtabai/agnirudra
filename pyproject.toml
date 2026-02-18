@@ -2,7 +2,7 @@
 name = "agnirudra"
 version = "0.1.0"
 description = "Agni: AI-powered visual QA testing for PRs. Rudra: Smart single-pass code review (coming soon)."
-authors = ["tabtabtabai"]
+authors = ["Agnirudra Contributors"]
 license = "GPL-3.0-only"
 readme = "README.md"
 packages = [{include = "agnirudra", from = "src"}]
@@ -10,10 +10,15 @@ packages = [{include = "agnirudra", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 anthropic = ">=0.40.0"
+# Azure cloud provider
 azure-mgmt-compute = ">=33.0.0"
 azure-mgmt-network = ">=27.0.0"
 azure-identity = ">=1.17.0"
 azure-storage-blob = ">=12.20.0"
+# Hetzner cloud provider
+hcloud = ">=1.35.0"
+boto3 = ">=1.34.0"
+# Common
 PyGithub = ">=2.1.0"
 httpx = ">=0.27.0"
 pydantic = ">=2.5.0"
